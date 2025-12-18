@@ -1,0 +1,499 @@
+-- GGH Chat - Локальный чат для игроков с инжектором
+-- Автор: GGH
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+local GGHRemoteEvent
+local GGHRemoteFunction
+
+-- Проверяем, существует ли уже RemoteEvent
+if not ReplicatedStorage:FindFirstChild("GGH_Chat_Remote") then
+GGHRemoteEvent = Instance.new("RemoteEvent")
+GGHRemoteEvent.Name = "GGH_Chat_Remote"
+GGHRemoteEvent.Parent = ReplicatedStorage
+else
+GGHRemoteEvent = ReplicatedStorage:FindFirstChild("GGH_Chat_Remote")
+end
+
+if not ReplicatedStorage:FindFirstChild("GGH_Chat_Function") then
+GGHRemoteFunction = Instance.new("RemoteFunction")
+GGHRemoteFunction.Name = "GGH_Chat_Function"
+GGHRemoteFunction.Parent = ReplicatedStorage
+else
+GGHRemoteFunction = ReplicatedStorage:FindFirstChild("GGH_Chat_Function")
+end
+
+-- Таблица для хранения игроков с GGH Chat
+local GGHPlayers = {}
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local CloseButton = Instance.new("TextButton")
+local ChatLog = Instance.new("ScrollingFrame")
+local ChatTemplate = Instance.new("TextLabel")
+local ChatBox = Instance.new("TextBox")
+local SendButton = Instance.new("TextButton")
+local PlayersFrame = Instance.new("Frame")
+local PlayersTitle = Instance.new("TextLabel")
+local PlayersList = Instance.new("ScrollingFrame")
+local PlayerTemplate = Instance.new("TextLabel")
+local ToggleButton = Instance.new("TextButton")
+local ClearButton = Instance.new("TextButton")
+local SettingsButton = Instance.new("TextButton")
+local MinimizedFrame = Instance.new("Frame")
+local OpenButton = Instance.new("TextButton")
+
+local isMinimized = false
+local chatMessages = {}
+local playerColors = {
+Color3.fromRGB(255, 100, 100), -- Красный
+Color3.fromRGB(100, 255, 100), -- Зеленый
+Color3.fromRGB(100, 100, 255), -- Синий
+Color3.fromRGB(255, 255, 100), -- Желтый
+Color3.fromRGB(255, 100, 255), -- Розовый
+Color3.fromRGB(100, 255, 255), -- Голубой
+Color3.fromRGB(255, 150, 50) -- Оранжевый
+}
+
+local playerColorMap = {}
+local myColor = playerColors[math.random(1, #playerColors)]
+
+ScreenGui.Name = "GGH_Chat_GUI"
+ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MainFrame.BorderColor3 = Color3.fromRGB(50, 50, 70)
+MainFrame.BorderSizePixel = 2
+MainFrame.Position = UDim2.new(0.65, 0, 0.25, 0)
+MainFrame.Size = UDim2.new(0, 450, 0, 500)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = true
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "GGH Chat v1.0"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = Title
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseButton.BorderSizePixel = 0
+CloseButton.Position = UDim2.new(0.94, 0, 0.15, 0)
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+
+PlayersFrame.Name = "PlayersFrame"
+PlayersFrame.Parent = MainFrame
+PlayersFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+PlayersFrame.BorderSizePixel = 0
+PlayersFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+PlayersFrame.Size = UDim2.new(0.28, 0, 0.65, 0)
+
+PlayersTitle.Name = "PlayersTitle"
+PlayersTitle.Parent = PlayersFrame
+PlayersTitle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+PlayersTitle.BorderSizePixel = 0
+PlayersTitle.Size = UDim2.new(1, 0, 0, 25)
+PlayersTitle.Font = Enum.Font.Gotham
+PlayersTitle.Text = "Игроки (0)"
+PlayersTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayersTitle.TextSize = 12
+
+PlayersList.Name = "PlayersList"
+PlayersList.Parent = PlayersFrame
+PlayersList.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+PlayersList.BorderSizePixel = 0
+PlayersList.Position = UDim2.new(0, 0, 0, 25)
+PlayersList.Size = UDim2.new(1, 0, 1, -25)
+PlayersList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayersList.ScrollBarThickness = 6
+PlayersList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+PlayerTemplate.Name = "PlayerTemplate"
+PlayerTemplate.Parent = PlayersList
+PlayerTemplate.BackgroundTransparency = 1
+PlayerTemplate.Size = UDim2.new(1, -5, 0, 25)
+PlayerTemplate.Font = Enum.Font.Gotham
+PlayerTemplate.Text = ""
+PlayerTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayerTemplate.TextSize = 12
+PlayerTemplate.TextXAlignment = Enum.TextXAlignment.Left
+PlayerTemplate.Visible = false
+
+ChatLog.Name = "ChatLog"
+ChatLog.Parent = MainFrame
+ChatLog.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+ChatLog.BorderSizePixel = 0
+ChatLog.Position = UDim2.new(0.32, 0, 0.1, 0)
+ChatLog.Size = UDim2.new(0.66, 0, 0.65, 0)
+ChatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
+ChatLog.ScrollBarThickness = 8
+ChatLog.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ChatLog.ScrollingDirection = Enum.ScrollingDirection.Y
+
+ChatTemplate.Name = "ChatTemplate"
+ChatTemplate.Parent = ChatLog
+ChatTemplate.BackgroundTransparency = 1
+ChatTemplate.Size = UDim2.new(1, -10, 0, 30)
+ChatTemplate.Font = Enum.Font.Gotham
+ChatTemplate.Text = ""
+ChatTemplate.TextColor3 = Color3.fromRGB(200, 200, 200)
+ChatTemplate.TextSize = 12
+ChatTemplate.TextXAlignment = Enum.TextXAlignment.Left
+ChatTemplate.TextWrapped = true
+ChatTemplate.Visible = false
+
+ChatBox.Name = "ChatBox"
+ChatBox.Parent = MainFrame
+ChatBox.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+ChatBox.BorderColor3 = Color3.fromRGB(60, 60, 80)
+ChatBox.BorderSizePixel = 1
+ChatBox.Position = UDim2.new(0.32, 0, 0.76, 0)
+ChatBox.Size = UDim2.new(0.5, 0, 0.08, 0)
+ChatBox.Font = Enum.Font.Gotham
+ChatBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+ChatBox.PlaceholderText = "Напишите сообщение..."
+ChatBox.Text = ""
+ChatBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+ChatBox.TextSize = 14
+ChatBox.TextWrapped = true
+ChatBox.ClearTextOnFocus = false
+
+SendButton.Name = "SendButton"
+SendButton.Parent = MainFrame
+SendButton.BackgroundColor3 = Color3.fromRGB(70, 120, 200)
+SendButton.BorderColor3 = Color3.fromRGB(50, 100, 180)
+SendButton.BorderSizePixel = 1
+SendButton.Position = UDim2.new(0.83, 0, 0.76, 0)
+SendButton.Size = UDim2.new(0.15, 0, 0.08, 0)
+SendButton.Font = Enum.Font.GothamBold
+SendButton.Text = "▶"
+SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendButton.TextSize = 16
+
+ClearButton.Name = "ClearButton"
+ClearButton.Parent = MainFrame
+ClearButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+ClearButton.BorderColor3 = Color3.fromRGB(70, 70, 90)
+ClearButton.BorderSizePixel = 1
+ClearButton.Position = UDim2.new(0.02, 0, 0.85, 0)
+ClearButton.Size = UDim2.new(0.28, 0, 0.05, 0)
+ClearButton.Font = Enum.Font.Gotham
+ClearButton.Text = "Очистить чат"
+ClearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearButton.TextSize = 12
+
+SettingsButton.Name = "SettingsButton"
+SettingsButton.Parent = MainFrame
+SettingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+SettingsButton.BorderColor3 = Color3.fromRGB(70, 70, 90)
+SettingsButton.BorderSizePixel = 1
+SettingsButton.Position = UDim2.new(0.32, 0, 0.85, 0)
+SettingsButton.Size = UDim2.new(0.34, 0, 0.05, 0)
+SettingsButton.Font = Enum.Font.Gotham
+SettingsButton.Text = "Свернуть"
+SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsButton.TextSize = 12
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = MainFrame
+ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+ToggleButton.BorderColor3 = Color3.fromRGB(70, 70, 90)
+ToggleButton.BorderSizePixel = 1
+ToggleButton.Position = UDim2.new(0.67, 0, 0.85, 0)
+ToggleButton.Size = UDim2.new(0.31, 0, 0.05, 0)
+ToggleButton.Font = Enum.Font.Gotham
+ToggleButton.Text = "Скрыть игроков"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 12
+
+MinimizedFrame.Name = "MinimizedFrame"
+MinimizedFrame.Parent = ScreenGui
+MinimizedFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+MinimizedFrame.BorderColor3 = Color3.fromRGB(60, 60, 80)
+MinimizedFrame.BorderSizePixel = 2
+MinimizedFrame.Position = MainFrame.Position
+MinimizedFrame.Size = UDim2.new(0, 120, 0, 35)
+MinimizedFrame.Active = true
+MinimizedFrame.Draggable = true
+MinimizedFrame.Visible = false
+
+OpenButton.Name = "OpenButton"
+OpenButton.Parent = MinimizedFrame
+OpenButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+OpenButton.BorderSizePixel = 0
+OpenButton.Size = UDim2.new(1, 0, 1, 0)
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.Text = "GGH Chat ▶"
+OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenButton.TextSize = 14
+
+function addMessageToChat(playerName, message, isSystem, color)
+local newMessage = ChatTemplate:Clone()
+newMessage.Parent = ChatLog
+newMessage.Visible = true
+
+local timestamp = os.date("%H:%M:%S")
+
+if isSystem then
+    newMessage.Text = string.format("[%s] [SYSTEM]: %s", timestamp, message)
+    newMessage.TextColor3 = Color3.fromRGB(255, 150, 50)
+else
+    newMessage.Text = string.format("[%s] [%s]: %s", timestamp, playerName, message)
+    if color then
+        newMessage.TextColor3 = color
+    else
+        newMessage.TextColor3 = Color3.fromRGB(200, 200, 255)
+    end
+end
+
+
+wait()
+ChatLog.CanvasPosition = Vector2.new(0, ChatLog.CanvasSize.Y.Offset)
+
+table.insert(chatMessages, {
+    playerName = playerName,
+    message = message,
+    timestamp = timestamp,
+    isSystem = isSystem,
+    color = color
+})
+end
+
+function sendChatMessage(message)
+if message and string.len(message) > 0 and string.len(message) <= 200 then
+-- Отправляем сообщение через RemoteEvent
+local success, err = pcall(function()
+GGHRemoteEvent:FireServer("GGH_Message", {
+Sender = Player.Name,
+Message = message,
+Color = myColor,
+Timestamp = os.date("%H:%M:%S")
+})
+end)
+
+    if success then
+        addMessageToChat(Player.Name, message, false, myColor)
+        ChatBox.Text = ""
+        ChatBox:CaptureFocus()
+    else
+        addMessageToChat("SYSTEM", "Ошибка отправки: " .. tostring(err), true)
+    end
+elseif string.len(message) > 200 then
+    addMessageToChat("SYSTEM", "Сообщение слишком длинное (макс. 200 символов)", true)
+end
+end
+
+function updatePlayersList()
+
+for _, child in ipairs(PlayersList:GetChildren()) do
+    if child:IsA("TextLabel") and child ~= PlayerTemplate then
+        child:Destroy()
+    end
+end
+
+
+local myEntry = PlayerTemplate:Clone()
+myEntry.Parent = PlayersList
+myEntry.Visible = true
+myEntry.Text = Player.Name .. " (Вы)"
+myEntry.TextColor3 = myColor
+
+-- Добавляем других игроков
+for playerName, color in pairs(GGHPlayers) do
+    if playerName ~= Player.Name then
+        local playerEntry = PlayerTemplate:Clone()
+        playerEntry.Parent = PlayersList
+        playerEntry.Visible = true
+        playerEntry.Text = playerName
+        playerEntry.TextColor3 = color
+    end
+end
+
+PlayersTitle.Text = string.format("Игроки (%d)", #PlayersList:GetChildren() - 1)
+end
+
+function registerPlayer(playerName)
+if not GGHPlayers[playerName] and playerName ~= Player.Name then
+local color = playerColors[(#GGHPlayers % #playerColors) + 1]
+GGHPlayers[playerName] = color
+addMessageToChat("SYSTEM", playerName .. " присоединился к GGH Chat!", true)
+updatePlayersList()
+
+    -- Уведомляем нового игрока о нашем существовании
+    pcall(function()
+        GGHRemoteEvent:FireServer("GGH_Register", {
+            Sender = Player.Name,
+            Color = myColor
+        })
+    end)
+end
+end
+
+function removePlayer(playerName)
+if GGHPlayers[playerName] then
+GGHPlayers[playerName] = nil
+addMessageToChat("SYSTEM", playerName .. " покинул GGH Chat", true)
+updatePlayersList()
+end
+end
+
+function togglePlayersList()
+if PlayersFrame.Visible then
+PlayersFrame.Visible = false
+ChatLog.Size = UDim2.new(0.96, 0, 0.65, 0)
+ChatLog.Position = UDim2.new(0.02, 0, 0.1, 0)
+ToggleButton.Text = "Показать игроков"
+else
+PlayersFrame.Visible = true
+ChatLog.Size = UDim2.new(0.66, 0, 0.65, 0)
+ChatLog.Position = UDim2.new(0.32, 0, 0.1, 0)
+ToggleButton.Text = "Скрыть игроков"
+end
+end
+
+function toggleMinimize()
+isMinimized = not isMinimized
+
+if isMinimized then
+    MainFrame.Visible = false
+    MinimizedFrame.Visible = true
+    MinimizedFrame.Position = MainFrame.Position
+    SettingsButton.Text = "Развернуть"
+    OpenButton.Text = "GGH Chat ▶"
+else
+    MainFrame.Visible = true
+    MinimizedFrame.Visible = false
+    MainFrame.Position = MinimizedFrame.Position
+    SettingsButton.Text = "Свернуть"
+end
+end
+
+function clearChat()
+for _, child in ipairs(ChatLog:GetChildren()) do
+if child:IsA("TextLabel") and child ~= ChatTemplate then
+child:Destroy()
+end
+end
+chatMessages = {}
+addMessageToChat("SYSTEM", "Чат очищен", true)
+end
+
+GGHRemoteEvent.OnClientEvent:Connect(function(action, data)
+if action == "GGH_Message" then
+if data.Sender and data.Message and data.Color then
+if not GGHPlayers[data.Sender] then
+registerPlayer(data.Sender)
+end
+addMessageToChat(data.Sender, data.Message, false, data.Color)
+end
+elseif action == "GGH_Register" then
+if data.Sender and data.Color then
+registerPlayer(data.Sender)
+GGHPlayers[data.Sender] = data.Color
+updatePlayersList()
+end
+elseif action == "GGH_Leave" then
+if data.Sender then
+removePlayer(data.Sender)
+end
+end
+end)
+
+GGHRemoteFunction.OnClientInvoke = function(action)
+if action == "GGH_Check" then
+return {
+Name = Player.Name,
+Color = myColor,
+Version = "1.0"
+}
+end
+return nil
+end
+
+SendButton.MouseButton1Click:Connect(function()
+sendChatMessage(ChatBox.Text)
+end)
+
+ChatBox.FocusLost:Connect(function(enterPressed)
+if enterPressed then
+sendChatMessage(ChatBox.Text)
+end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+-- Уведомляем об отключении
+pcall(function()
+GGHRemoteEvent:FireServer("GGH_Leave", {
+Sender = Player.Name
+})
+end)
+ScreenGui:Destroy()
+end)
+
+ClearButton.MouseButton1Click:Connect(clearChat)
+SettingsButton.MouseButton1Click:Connect(toggleMinimize)
+ToggleButton.MouseButton1Click:Connect(togglePlayersList)
+OpenButton.MouseButton1Click:Connect(toggleMinimize)
+
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.Keyboard then
+if input.KeyCode == Enum.KeyCode.Slash then
+ChatBox:CaptureFocus()
+elseif input.KeyCode == Enum.KeyCode.Escape then
+ChatBox:ReleaseFocus()
+elseif input.KeyCode == Enum.KeyCode.L and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+clearChat()
+elseif input.KeyCode == Enum.KeyCode.M and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+toggleMinimize()
+elseif input.KeyCode == Enum.KeyCode.P and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+togglePlayersList()
+end
+end
+end)
+
+addMessageToChat("SYSTEM", "GGH Chat активирован!", true)
+addMessageToChat("SYSTEM", "Добро пожаловать в приватный чат!", true)
+addMessageToChat("SYSTEM", "Используйте / для быстрого ввода сообщения", true)
+
+-- Автоматически регистрируем себя
+pcall(function()
+GGHRemoteEvent:FireServer("GGH_Register", {
+Sender = Player.Name,
+Color = myColor
+})
+end)
+
+while wait(5) do
+-- Отправляем ping для обновления статуса
+pcall(function()
+GGHRemoteEvent:FireServer("GGH_Ping", {
+Sender = Player.Name
+})
+end)
+end
+
+print("GGH Chat успешно загружен!")
+print("Горячие клавиши:")
+print("/ - фокус на чат")
+print("Ctrl+L - очистить чат")
+print("Ctrl+M - свернуть/развернуть")
+print("Ctrl+P - скрыть/показать список игроков")
