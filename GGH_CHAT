@@ -1,16 +1,13 @@
 -- GGH Chat - Локальный чат для игроков с инжектором
--- Автор: GGH
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
--- Создаем RemoteEvent для общения
 local GGHRemoteEvent
 local GGHRemoteFunction
 
--- Проверяем, существует ли уже RemoteEvent
 if not ReplicatedStorage:FindFirstChild("GGH_Chat_Remote") then
     GGHRemoteEvent = Instance.new("RemoteEvent")
     GGHRemoteEvent.Name = "GGH_Chat_Remote"
@@ -27,10 +24,8 @@ else
     GGHRemoteFunction = ReplicatedStorage:FindFirstChild("GGH_Chat_Function")
 end
 
--- Таблица для хранения игроков с GGH Chat
 local GGHPlayers = {}
 
--- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
@@ -49,30 +44,27 @@ local SettingsButton = Instance.new("TextButton")
 local MinimizedFrame = Instance.new("Frame")
 local OpenButton = Instance.new("TextButton")
 
--- Настройки
 local isMinimized = false
 local chatMessages = {}
 local playerColors = {
-    Color3.fromRGB(255, 100, 100),    -- Красный
-    Color3.fromRGB(100, 255, 100),    -- Зеленый
-    Color3.fromRGB(100, 100, 255),    -- Синий
-    Color3.fromRGB(255, 255, 100),    -- Желтый
-    Color3.fromRGB(255, 100, 255),    -- Розовый
-    Color3.fromRGB(100, 255, 255),    -- Голубой
-    Color3.fromRGB(255, 150, 50)      -- Оранжевый
+    Color3.fromRGB(255, 100, 100),
+    Color3.fromRGB(100, 255, 100),
+    Color3.fromRGB(100, 100, 255),
+    Color3.fromRGB(255, 255, 100),
+    Color3.fromRGB(255, 100, 255),
+    Color3.fromRGB(100, 255, 255),
+    Color3.fromRGB(255, 150, 50)
 }
 
 local playerColorMap = {}
 local myColor = playerColors[math.random(1, #playerColors)]
-local lastMessageY = 0
+local messageContainer = Instance.new("Frame")
 
--- Инициализация GUI
 ScreenGui.Name = "GGH_Chat_GUI"
 ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.ResetOnSpawn = false
 
--- Главное окно
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -84,7 +76,6 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = true
 
--- Заголовок
 Title.Name = "Title"
 Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
@@ -95,7 +86,6 @@ Title.Text = "GGH Chat v1.0"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 
--- Кнопка закрытия
 CloseButton.Name = "CloseButton"
 CloseButton.Parent = Title
 CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
@@ -107,7 +97,6 @@ CloseButton.Text = "X"
 CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseButton.TextSize = 14
 
--- Список игроков
 PlayersFrame.Name = "PlayersFrame"
 PlayersFrame.Parent = MainFrame
 PlayersFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
@@ -146,7 +135,6 @@ PlayerTemplate.TextSize = 12
 PlayerTemplate.TextXAlignment = Enum.TextXAlignment.Left
 PlayerTemplate.Visible = false
 
--- Область чата
 ChatLog.Name = "ChatLog"
 ChatLog.Parent = MainFrame
 ChatLog.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
@@ -158,8 +146,14 @@ ChatLog.ScrollBarThickness = 8
 ChatLog.ScrollingEnabled = true
 ChatLog.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
 
+messageContainer.Name = "MessageContainer"
+messageContainer.Parent = ChatLog
+messageContainer.BackgroundTransparency = 1
+messageContainer.Size = UDim2.new(1, 0, 1, 0)
+messageContainer.Position = UDim2.new(0, 0, 0, 0)
+
 ChatTemplate.Name = "ChatTemplate"
-ChatTemplate.Parent = ChatLog
+ChatTemplate.Parent = messageContainer
 ChatTemplate.BackgroundTransparency = 1
 ChatTemplate.Size = UDim2.new(1, -10, 0, 0)
 ChatTemplate.Font = Enum.Font.Gotham
@@ -170,7 +164,6 @@ ChatTemplate.TextXAlignment = Enum.TextXAlignment.Left
 ChatTemplate.TextWrapped = true
 ChatTemplate.Visible = false
 
--- Поле ввода
 ChatBox.Name = "ChatBox"
 ChatBox.Parent = MainFrame
 ChatBox.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
@@ -187,7 +180,6 @@ ChatBox.TextSize = 14
 ChatBox.TextWrapped = true
 ChatBox.ClearTextOnFocus = false
 
--- Кнопка отправки
 SendButton.Name = "SendButton"
 SendButton.Parent = MainFrame
 SendButton.BackgroundColor3 = Color3.fromRGB(70, 120, 200)
@@ -200,7 +192,6 @@ SendButton.Text = "▶"
 SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendButton.TextSize = 16
 
--- Кнопки управления
 ClearButton.Name = "ClearButton"
 ClearButton.Parent = MainFrame
 ClearButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
@@ -237,7 +228,6 @@ ToggleButton.Text = "Скрыть игроков"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 12
 
--- Минимизированное окно
 MinimizedFrame.Name = "MinimizedFrame"
 MinimizedFrame.Parent = ScreenGui
 MinimizedFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
@@ -259,30 +249,20 @@ OpenButton.Text = "GGH Chat ▶"
 OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 OpenButton.TextSize = 14
 
--- Функции чата
 function calculateTextHeight(text, fontSize, frameWidth)
-    local lineHeight = fontSize * 1.2
-    local charWidth = fontSize * 0.6
-    local maxCharsPerLine = math.floor(frameWidth / charWidth)
-    
-    local lines = 1
-    local currentLineLength = 0
-    
-    for word in text:gmatch("%S+") do
-        if currentLineLength + #word + 1 > maxCharsPerLine then
-            lines = lines + 1
-            currentLineLength = #word
-        else
-            currentLineLength = currentLineLength + #word + 1
-        end
-    end
-    
-    return math.max(25, lines * lineHeight)
+    local TextService = game:GetService("TextService")
+    local textSize = TextService:GetTextSize(
+        text,
+        fontSize,
+        Enum.Font.Gotham,
+        Vector2.new(frameWidth - 20, math.huge)
+    )
+    return math.max(20, textSize.Y + 10)
 end
 
 function addMessageToChat(playerName, message, isSystem, color)
     local newMessage = ChatTemplate:Clone()
-    newMessage.Parent = ChatLog
+    newMessage.Parent = messageContainer
     newMessage.Visible = true
     
     local timestamp = os.date("%H:%M:%S")
@@ -299,33 +279,40 @@ function addMessageToChat(playerName, message, isSystem, color)
         end
     end
     
-    -- Автоматически подбираем высоту сообщения
     local messageHeight = calculateTextHeight(newMessage.Text, 12, ChatLog.AbsoluteSize.X - 20)
     newMessage.Size = UDim2.new(1, -10, 0, messageHeight)
-    newMessage.Position = UDim2.new(0, 5, 0, lastMessageY)
     
-    -- Обновляем позицию для следующего сообщения
-    lastMessageY = lastMessageY + messageHeight + 5
+    local totalHeight = 0
+    local children = messageContainer:GetChildren()
     
-    -- Обновляем размер Canvas
-    ChatLog.CanvasSize = UDim2.new(0, 0, 0, lastMessageY)
+    for _, child in ipairs(children) do
+        if child:IsA("TextLabel") and child ~= ChatTemplate and child ~= newMessage then
+            totalHeight = totalHeight + child.Size.Y.Offset + 5
+        end
+    end
     
-    -- Прокручиваем вниз
+    newMessage.Position = UDim2.new(0, 5, 0, totalHeight)
+    
+    totalHeight = totalHeight + messageHeight + 5
+    messageContainer.Size = UDim2.new(1, 0, 0, totalHeight)
+    
+    ChatLog.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    
     wait(0.05)
-    ChatLog.CanvasPosition = Vector2.new(0, lastMessageY + 100)
+    ChatLog.CanvasPosition = Vector2.new(0, totalHeight + 100)
     
     table.insert(chatMessages, {
         playerName = playerName,
         message = message,
         timestamp = timestamp,
         isSystem = isSystem,
-        color = color
+        color = color,
+        uiElement = newMessage
     })
 end
 
 function sendChatMessage(message)
     if message and string.len(message) > 0 and string.len(message) <= 200 then
-        -- Отправляем сообщение через RemoteEvent
         local success, err = pcall(function()
             GGHRemoteEvent:FireServer("GGH_Message", {
                 Sender = Player.Name,
@@ -348,14 +335,12 @@ function sendChatMessage(message)
 end
 
 function updatePlayersList()
-    -- Очищаем список
     for _, child in ipairs(PlayersList:GetChildren()) do
         if child:IsA("TextLabel") and child ~= PlayerTemplate then
             child:Destroy()
         end
     end
     
-    -- Добавляем себя
     local myEntry = PlayerTemplate:Clone()
     myEntry.Parent = PlayersList
     myEntry.Visible = true
@@ -365,7 +350,6 @@ function updatePlayersList()
     
     local playerCount = 1
     
-    -- Добавляем других игроков
     for playerName, color in pairs(GGHPlayers) do
         if playerName ~= Player.Name then
             local playerEntry = PlayerTemplate:Clone()
@@ -380,7 +364,6 @@ function updatePlayersList()
     
     PlayersTitle.Text = string.format("Игроки (%d)", playerCount - 1)
     
-    -- Обновляем размер Canvas
     PlayersList.CanvasSize = UDim2.new(0, 0, 0, playerCount * 25)
 end
 
@@ -391,7 +374,6 @@ function registerPlayer(playerName)
         addMessageToChat("SYSTEM", playerName .. " присоединился к GGH Chat!", true)
         updatePlayersList()
         
-        -- Уведомляем нового игрока о нашем существовании
         pcall(function()
             GGHRemoteEvent:FireServer("GGH_Register", {
                 Sender = Player.Name,
@@ -441,15 +423,13 @@ function toggleMinimize()
 end
 
 function clearChat()
-    -- Удаляем все сообщения
-    for _, child in ipairs(ChatLog:GetChildren()) do
+    for _, child in ipairs(messageContainer:GetChildren()) do
         if child:IsA("TextLabel") and child ~= ChatTemplate then
             child:Destroy()
         end
     end
     
-    -- Сбрасываем позицию
-    lastMessageY = 0
+    messageContainer.Size = UDim2.new(1, 0, 0, 0)
     ChatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
     ChatLog.CanvasPosition = Vector2.new(0, 0)
     
@@ -457,7 +437,26 @@ function clearChat()
     addMessageToChat("SYSTEM", "Чат очищен", true)
 end
 
--- Настройка RemoteEvent
+function reorderMessages()
+    local totalHeight = 0
+    local children = messageContainer:GetChildren()
+    
+    for _, child in ipairs(children) do
+        if child:IsA("TextLabel") and child ~= ChatTemplate then
+            local messageHeight = calculateTextHeight(child.Text, 12, ChatLog.AbsoluteSize.X - 20)
+            child.Size = UDim2.new(1, -10, 0, messageHeight)
+            child.Position = UDim2.new(0, 5, 0, totalHeight)
+            totalHeight = totalHeight + messageHeight + 5
+        end
+    end
+    
+    messageContainer.Size = UDim2.new(1, 0, 0, totalHeight)
+    ChatLog.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    
+    wait(0.05)
+    ChatLog.CanvasPosition = Vector2.new(0, totalHeight + 100)
+end
+
 GGHRemoteEvent.OnClientEvent:Connect(function(action, data)
     if action == "GGH_Message" then
         if data.Sender and data.Message and data.Color then
@@ -479,7 +478,6 @@ GGHRemoteEvent.OnClientEvent:Connect(function(action, data)
     end
 end)
 
--- Настройка RemoteFunction для проверки подключения
 GGHRemoteFunction.OnClientInvoke = function(action)
     if action == "GGH_Check" then
         return {
@@ -491,7 +489,6 @@ GGHRemoteFunction.OnClientInvoke = function(action)
     return nil
 end
 
--- Обработчики событий GUI
 SendButton.MouseButton1Click:Connect(function()
     sendChatMessage(ChatBox.Text)
 end)
@@ -503,7 +500,6 @@ ChatBox.FocusLost:Connect(function(enterPressed)
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
-    -- Уведомляем об отключении
     pcall(function()
         GGHRemoteEvent:FireServer("GGH_Leave", {
             Sender = Player.Name
@@ -517,7 +513,6 @@ SettingsButton.MouseButton1Click:Connect(toggleMinimize)
 ToggleButton.MouseButton1Click:Connect(togglePlayersList)
 OpenButton.MouseButton1Click:Connect(toggleMinimize)
 
--- Горячие клавиши
 local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -531,34 +526,39 @@ UserInputService.InputBegan:Connect(function(input)
             toggleMinimize()
         elseif input.KeyCode == Enum.KeyCode.P and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
             togglePlayersList()
+        elseif input.KeyCode == Enum.KeyCode.R and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            reorderMessages()
         end
     end
 end)
 
--- Инициализация
+ChatLog:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    reorderMessages()
+end)
+
 addMessageToChat("SYSTEM", "GGH Chat активирован!", true)
 addMessageToChat("SYSTEM", "Добро пожаловать в приватный чат!", true)
 addMessageToChat("SYSTEM", "Используйте / для быстрого ввода сообщения", true)
 
--- Автоматически регистрируем себя
-pcall(function()
-    GGHRemoteEvent:FireServer("GGH_Register", {
-        Sender = Player.Name,
-        Color = myColor
-    })
+spawn(function()
+    wait(1)
+    addMessageToChat("TEST", "Первое сообщение", false, Color3.fromRGB(100, 255, 100))
+    wait(0.5)
+    addMessageToChat("TEST", "Второе сообщение", false, Color3.fromRGB(100, 255, 100))
+    wait(0.5)
+    addMessageToChat("TEST", "Третье сообщение", false, Color3.fromRGB(100, 255, 100))
+    wait(0.5)
+    addMessageToChat("SYSTEM", "Теперь вы видите, что сообщения идут строго друг под другом!", true)
 end)
 
--- Функция для авто-прокрутки при изменении размера окна
-ChatLog:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-    -- При изменении размера пересчитываем высоту сообщений
-    if #chatMessages > 0 then
-        local tempMessages = chatMessages
-        clearChat()
-        
-        for _, msg in ipairs(tempMessages) do
-            addMessageToChat(msg.playerName, msg.message, msg.isSystem, msg.color)
-        end
-    end
+spawn(function()
+    wait(2)
+    pcall(function()
+        GGHRemoteEvent:FireServer("GGH_Register", {
+            Sender = Player.Name,
+            Color = myColor
+        })
+    end)
 end)
 
 print("GGH Chat успешно загружен!")
@@ -567,3 +567,4 @@ print("/ - фокус на чат")
 print("Ctrl+L - очистить чат")
 print("Ctrl+M - свернуть/развернуть")
 print("Ctrl+P - скрыть/показать список игроков")
+print("Ctrl+R - переупорядочить сообщения")
