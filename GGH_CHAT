@@ -1,4 +1,4 @@
--- GGH Chat v4.0 - Рабочий синхронизированный чат без дублирования
+-- GGH Chat v5.0 - Простой РАБОЧИЙ чат через SharedTable
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,208 +6,109 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local Player = Players.LocalPlayer
 
--- Уникальный ID для этого сеанса чата
-local SESSION_ID = HttpService:GenerateGUID(false):sub(1, 8)
-local MY_ID = Player.UserId .. "_" .. SESSION_ID
-
--- Глобальная таблица для синхронизации (основная фишка)
-if not _G.GGH_CHAT_GLOBAL then
-    _G.GGH_CHAT_GLOBAL = {
-        Players = {},      -- Игроки онлайн
-        Messages = {},     -- Сообщения
-        LastMessageId = 0, -- ID последнего сообщения
-        Sessions = {}      -- Активные сессии
+-- СОЗДАЕМ ГЛОБАЛЬНУЮ ТАБЛИЦУ для всех игроков
+if not _G.GGH_SHARED_CHAT then
+    _G.GGH_SHARED_CHAT = {
+        Messages = {},
+        Players = {},
+        LastUpdate = tick()
     }
 end
 
--- Мои данные
-_G.GGH_CHAT_GLOBAL.Sessions[MY_ID] = {
-    PlayerName = Player.Name,
-    Color = Color3.fromHSV(math.random(), 0.7, 0.9),
-    LastPing = tick(),
+-- Мой уникальный ID
+local MY_PLAYER_ID = "P_" .. Player.UserId .. "_" .. HttpService:GenerateGUID(false):sub(1, 4)
+local MY_COLOR = Color3.fromHSV(math.random(), 0.8, 0.9)
+
+-- Регистрируем себя
+_G.GGH_SHARED_CHAT.Players[MY_PLAYER_ID] = {
+    Name = Player.Name,
+    Color = MY_COLOR,
+    LastActive = tick(),
     Active = true
 }
 
-local MyColor = _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].Color
-
--- Только моя локальная таблица сообщений (чтобы не дублировались)
-local MyMessages = {}
-local ReceivedMessageIds = {} -- Для отслеживания уже полученных сообщений
-
 -- Создаем GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GGH_Chat_" .. SESSION_ID
-ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
+ScreenGui.Name = "GGH_Chat_V5"
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.ResetOnSpawn = false
 
--- Основной контейнер
+-- Главное окно
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.65, 0, 0.25, 0)
-MainFrame.Size = UDim2.new(0, 500, 0, 600)
+MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 450, 0, 500)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- Закругления
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
--- Верхняя панель
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Parent = MainFrame
-TopBar.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
-TopBar.Size = UDim2.new(1, 0, 0, 50)
-
-local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 12)
-TopBarCorner.Parent = TopBar
-
 -- Заголовок
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Parent = TopBar
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(0.7, 0, 1, 0)
-Title.Position = UDim2.new(0.02, 0, 0, 0)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "GGH CHAT v4.0"
-Title.TextColor3 = Color3.fromRGB(0, 200, 255)
-Title.TextSize = 18
-Title.TextXAlignment = Enum.TextXAlignment.Left
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
 
-local Status = Instance.new("TextLabel")
-Status.Name = "Status"
-Status.Parent = TopBar
-Status.BackgroundTransparency = 1
-Status.Size = UDim2.new(0.7, 0, 0.5, 0)
-Status.Position = UDim2.new(0.02, 0, 0.5, 0)
-Status.Font = Enum.Font.Gotham
-Status.Text = "Connected • Players: 1"
-Status.TextColor3 = Color3.fromRGB(150, 200, 255)
-Status.TextSize = 12
-Status.TextXAlignment = Enum.TextXAlignment.Left
+local TitleText = Instance.new("TextLabel")
+TitleText.Name = "TitleText"
+TitleText.Parent = TitleBar
+TitleText.BackgroundTransparency = 1
+TitleText.Size = UDim2.new(0.7, 0, 1, 0)
+TitleText.Position = UDim2.new(0.05, 0, 0, 0)
+TitleText.Font = Enum.Font.GothamBold
+TitleText.Text = "GGH CHAT v5.0"
+TitleText.TextColor3 = Color3.fromRGB(0, 180, 255)
+TitleText.TextSize = 18
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
 
--- Кнопки
+local PlayerCount = Instance.new("TextLabel")
+PlayerCount.Name = "PlayerCount"
+PlayerCount.Parent = TitleBar
+PlayerCount.BackgroundTransparency = 1
+PlayerCount.Size = UDim2.new(0.2, 0, 1, 0)
+PlayerCount.Position = UDim2.new(0.75, 0, 0, 0)
+PlayerCount.Font = Enum.Font.Gotham
+PlayerCount.Text = "Players: 1"
+PlayerCount.TextColor3 = Color3.fromRGB(150, 200, 255)
+PlayerCount.TextSize = 14
+
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Name = "CloseBtn"
-CloseBtn.Parent = TopBar
+CloseBtn.Parent = TitleBar
 CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(0.95, -35, 0.5, -15)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "×"
+CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 20
+CloseBtn.TextSize = 16
 CloseBtn.AutoButtonColor = false
 
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Name = "MinimizeBtn"
-MinimizeBtn.Parent = TopBar
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(0.95, -70, 0.5, -15)
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.Text = "_"
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.TextSize = 16
-MinimizeBtn.AutoButtonColor = false
+-- Область сообщений
+local ChatFrame = Instance.new("ScrollingFrame")
+ChatFrame.Name = "ChatFrame"
+ChatFrame.Parent = MainFrame
+ChatFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 28)
+ChatFrame.BorderSizePixel = 0
+ChatFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+ChatFrame.Size = UDim2.new(0.96, 0, 0.75, 0)
+ChatFrame.ScrollBarThickness = 8
+ChatFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+ChatFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ChatFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
--- Основное содержимое
-local Content = Instance.new("Frame")
-Content.Name = "Content"
-Content.Parent = MainFrame
-Content.BackgroundTransparency = 1
-Content.Position = UDim2.new(0, 10, 0, 60)
-Content.Size = UDim2.new(1, -20, 1, -70)
-
--- Левая панель (игроки)
-local PlayersPanel = Instance.new("Frame")
-PlayersPanel.Name = "PlayersPanel"
-PlayersPanel.Parent = Content
-PlayersPanel.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
-PlayersPanel.Size = UDim2.new(0.3, 0, 1, 0)
-PlayersPanel.Position = UDim2.new(0, 0, 0, 0)
-
-local PlayersCorner = Instance.new("UICorner")
-PlayersCorner.CornerRadius = UDim.new(0, 8)
-PlayersCorner.Parent = PlayersPanel
-
-local PlayersHeader = Instance.new("TextLabel")
-PlayersHeader.Name = "PlayersHeader"
-PlayersHeader.Parent = PlayersPanel
-PlayersHeader.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-PlayersHeader.Size = UDim2.new(1, 0, 0, 40)
-PlayersHeader.Font = Enum.Font.GothamBold
-PlayersHeader.Text = "PLAYERS ONLINE"
-PlayersHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayersHeader.TextSize = 14
-
-local PlayersList = Instance.new("ScrollingFrame")
-PlayersList.Name = "PlayersList"
-PlayersList.Parent = PlayersPanel
-PlayersList.BackgroundTransparency = 1
-PlayersList.Size = UDim2.new(1, -5, 1, -45)
-PlayersList.Position = UDim2.new(0, 5, 0, 45)
-PlayersList.ScrollBarThickness = 5
-PlayersList.CanvasSize = UDim2.new(0, 0, 0, 0)
-PlayersList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
-local PlayerTemplate = Instance.new("TextLabel")
-PlayerTemplate.Name = "PlayerTemplate"
-PlayerTemplate.Parent = PlayersList
-PlayerTemplate.BackgroundTransparency = 1
-PlayerTemplate.Size = UDim2.new(1, 0, 0, 30)
-PlayerTemplate.Font = Enum.Font.Gotham
-PlayerTemplate.Text = ""
-PlayerTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayerTemplate.TextSize = 13
-PlayerTemplate.TextXAlignment = Enum.TextXAlignment.Left
-PlayerTemplate.Visible = false
-
--- Правая панель (чат)
-local ChatPanel = Instance.new("Frame")
-ChatPanel.Name = "ChatPanel"
-ChatPanel.Parent = Content
-ChatPanel.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
-ChatPanel.Size = UDim2.new(0.68, 0, 1, 0)
-ChatPanel.Position = UDim2.new(0.32, 0, 0, 0)
-
-local ChatCorner = Instance.new("UICorner")
-ChatCorner.CornerRadius = UDim.new(0, 8)
-ChatCorner.Parent = ChatPanel
-
-local ChatHeader = Instance.new("TextLabel")
-ChatHeader.Name = "ChatHeader"
-ChatHeader.Parent = ChatPanel
-ChatHeader.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-ChatHeader.Size = UDim2.new(1, 0, 0, 40)
-ChatHeader.Font = Enum.Font.GothamBold
-ChatHeader.Text = "GGH CHAT"
-ChatHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
-ChatHeader.TextSize = 16
-
-local MessagesScroll = Instance.new("ScrollingFrame")
-MessagesScroll.Name = "MessagesScroll"
-MessagesScroll.Parent = ChatPanel
-MessagesScroll.BackgroundTransparency = 1
-MessagesScroll.Size = UDim2.new(1, -10, 1, -100)
-MessagesScroll.Position = UDim2.new(0, 5, 0, 45)
-MessagesScroll.ScrollBarThickness = 8
-MessagesScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
-MessagesScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-MessagesScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
+-- Шаблон сообщения
 local MessageTemplate = Instance.new("TextLabel")
 MessageTemplate.Name = "MessageTemplate"
-MessageTemplate.Parent = MessagesScroll
+MessageTemplate.Parent = ChatFrame
 MessageTemplate.BackgroundTransparency = 1
-MessageTemplate.Size = UDim2.new(1, -10, 0, 0)
+MessageTemplate.Size = UDim2.new(0.98, 0, 0, 0)
 MessageTemplate.Font = Enum.Font.Gotham
 MessageTemplate.Text = ""
 MessageTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -217,26 +118,22 @@ MessageTemplate.TextXAlignment = Enum.TextXAlignment.Left
 MessageTemplate.Visible = false
 
 -- Панель ввода
-local InputPanel = Instance.new("Frame")
-InputPanel.Name = "InputPanel"
-InputPanel.Parent = ChatPanel
-InputPanel.BackgroundColor3 = Color3.fromRGB(35, 45, 65)
-InputPanel.Size = UDim2.new(1, -10, 0, 50)
-InputPanel.Position = UDim2.new(0, 5, 1, -55)
-
-local InputCorner = Instance.new("UICorner")
-InputCorner.CornerRadius = UDim.new(0, 6)
-InputCorner.Parent = InputPanel
+local InputFrame = Instance.new("Frame")
+InputFrame.Name = "InputFrame"
+InputFrame.Parent = MainFrame
+InputFrame.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+InputFrame.Position = UDim2.new(0.02, 0, 0.86, 0)
+InputFrame.Size = UDim2.new(0.96, 0, 0.12, 0)
 
 local ChatInput = Instance.new("TextBox")
 ChatInput.Name = "ChatInput"
-ChatInput.Parent = InputPanel
-ChatInput.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
-ChatInput.Size = UDim2.new(0.75, 0, 0.8, 0)
-ChatInput.Position = UDim2.new(0.02, 0, 0.1, 0)
+ChatInput.Parent = InputFrame
+ChatInput.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+ChatInput.Size = UDim2.new(0.7, 0, 0.7, 0)
+ChatInput.Position = UDim2.new(0.02, 0, 0.15, 0)
 ChatInput.Font = Enum.Font.Gotham
 ChatInput.PlaceholderColor3 = Color3.fromRGB(150, 150, 180)
-ChatInput.PlaceholderText = "Type message..."
+ChatInput.PlaceholderText = "Type message here..."
 ChatInput.Text = ""
 ChatInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 ChatInput.TextSize = 14
@@ -244,344 +141,286 @@ ChatInput.TextXAlignment = Enum.TextXAlignment.Left
 
 local SendButton = Instance.new("TextButton")
 SendButton.Name = "SendButton"
-SendButton.Parent = InputPanel
+SendButton.Parent = InputFrame
 SendButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-SendButton.Size = UDim2.new(0.2, 0, 0.8, 0)
-SendButton.Position = UDim2.new(0.78, 0, 0.1, 0)
+SendButton.Size = UDim2.new(0.25, 0, 0.7, 0)
+SendButton.Position = UDim2.new(0.73, 0, 0.15, 0)
 SendButton.Font = Enum.Font.GothamBold
 SendButton.Text = "SEND"
 SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendButton.TextSize = 14
 SendButton.AutoButtonColor = false
 
--- Минимизированный вид
-local MinimizedFrame = Instance.new("Frame")
-MinimizedFrame.Name = "MinimizedFrame"
-MinimizedFrame.Parent = ScreenGui
-MinimizedFrame.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-MinimizedFrame.BorderSizePixel = 0
-MinimizedFrame.Position = MainFrame.Position
-MinimizedFrame.Size = UDim2.new(0, 160, 0, 40)
-MinimizedFrame.Active = true
-MinimizedFrame.Draggable = true
-MinimizedFrame.Visible = false
+-- Закругления
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = ChatInput
 
-local OpenButton = Instance.new("TextButton")
-OpenButton.Name = "OpenButton"
-OpenButton.Parent = MinimizedFrame
-OpenButton.BackgroundTransparency = 1
-OpenButton.Size = UDim2.new(1, 0, 1, 0)
-OpenButton.Font = Enum.Font.GothamBold
-OpenButton.Text = "GGH CHAT"
-OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-OpenButton.TextSize = 14
+local SendCorner = Instance.new("UICorner")
+SendCorner.CornerRadius = UDim.new(0, 6)
+SendCorner.Parent = SendButton
 
--- Функции
-local function calculateTextHeight(text, width)
-    local TextService = game:GetService("TextService")
-    local textSize = TextService:GetTextSize(
-        text,
-        13,
-        Enum.Font.Gotham,
-        Vector2.new(width - 20, math.huge)
-    )
-    return math.max(25, textSize.Y + 10)
-end
+-- Функции чата
+local lastMessageId = 0
+local displayedMessages = {}
 
-local function addMessageToChat(sender, message, isSystem, color, messageId)
-    -- Проверяем, не получали ли мы уже это сообщение
-    if messageId and ReceivedMessageIds[messageId] then
-        return -- Пропускаем дубликат
+local function addMessage(sender, message, color, isSystem, messageId)
+    -- Проверяем, не отображали ли уже это сообщение
+    if displayedMessages[messageId] then
+        return
     end
     
-    if messageId then
-        ReceivedMessageIds[messageId] = true
-    end
+    displayedMessages[messageId] = true
     
     local timestamp = os.date("%H:%M:%S")
     local displayName = isSystem and "[SYSTEM]" or sender
-    local textColor = isSystem and Color3.fromRGB(255, 200, 0) or color or Color3.fromRGB(200, 200, 255)
+    local messageColor = isSystem and Color3.fromRGB(255, 200, 0) or color
     
-    -- Создаем сообщение
+    -- Создаем новый элемент сообщения
     local newMessage = MessageTemplate:Clone()
-    newMessage.Parent = MessagesScroll
+    newMessage.Parent = ChatFrame
     newMessage.Visible = true
-    newMessage.TextColor3 = textColor
+    newMessage.TextColor3 = messageColor
     
-    local messageText
-    if isSystem then
-        messageText = string.format("[%s] %s: %s", timestamp, displayName, message)
-    else
-        messageText = string.format("[%s] %s: %s", timestamp, displayName, message)
-    end
-    
+    local messageText = string.format("[%s] %s: %s", timestamp, displayName, message)
     newMessage.Text = messageText
     
-    -- Вычисляем высоту
-    local messageWidth = MessagesScroll.AbsoluteSize.X - 20
-    local messageHeight = calculateTextHeight(messageText, messageWidth)
-    newMessage.Size = UDim2.new(1, -10, 0, messageHeight)
+    -- Вычисляем высоту текста
+    local TextService = game:GetService("TextService")
+    local textSize = TextService:GetTextSize(
+        messageText,
+        13,
+        Enum.Font.Gotham,
+        Vector2.new(ChatFrame.AbsoluteSize.X - 30, math.huge)
+    )
+    
+    local messageHeight = math.max(25, textSize.Y + 10)
+    newMessage.Size = UDim2.new(0.98, 0, 0, messageHeight)
     
     -- Позиционируем
     local totalHeight = 0
-    for _, child in pairs(MessagesScroll:GetChildren()) do
+    for _, child in pairs(ChatFrame:GetChildren()) do
         if child:IsA("TextLabel") and child ~= MessageTemplate and child ~= newMessage then
             totalHeight = totalHeight + child.Size.Y.Offset + 5
         end
     end
     
-    newMessage.Position = UDim2.new(0, 5, 0, totalHeight)
+    newMessage.Position = UDim2.new(0.01, 0, 0, totalHeight)
     
     -- Автопрокрутка
     wait(0.05)
-    MessagesScroll.CanvasPosition = Vector2.new(0, MessagesScroll.CanvasSize.Y.Offset)
-    
-    -- Сохраняем в локальную историю
-    table.insert(MyMessages, {
-        id = messageId or #MyMessages + 1,
-        sender = sender,
-        message = message,
-        timestamp = timestamp,
-        isSystem = isSystem,
-        color = textColor
-    })
-    
-    -- Обновляем глобальную таблицу (только свои сообщения)
-    if sender == Player.Name then
-        _G.GGH_CHAT_GLOBAL.LastMessageId = _G.GGH_CHAT_GLOBAL.LastMessageId + 1
-        _G.GGH_CHAT_GLOBAL.Messages[_G.GGH_CHAT_GLOBAL.LastMessageId] = {
-            Sender = Player.Name,
-            Message = message,
-            Color = color,
-            Timestamp = timestamp,
-            SessionId = MY_ID,
-            MessageId = _G.GGH_CHAT_GLOBAL.LastMessageId
-        }
-    end
+    ChatFrame.CanvasPosition = Vector2.new(0, ChatFrame.CanvasSize.Y.Offset)
 end
 
-local function updatePlayersList()
-    -- Очищаем список
-    for _, child in pairs(PlayersList:GetChildren()) do
-        if child:IsA("TextLabel") and child ~= PlayerTemplate then
-            child:Destroy()
-        end
+local function sendMessage(text)
+    if not text or #text == 0 or #text > 200 then
+        return
     end
-    
-    local yOffset = 0
-    
-    -- Добавляем себя
-    local myEntry = PlayerTemplate:Clone()
-    myEntry.Parent = PlayersList
-    myEntry.Visible = true
-    myEntry.Text = Player.Name .. " (YOU)"
-    myEntry.TextColor3 = MyColor
-    myEntry.Position = UDim2.new(0, 5, 0, yOffset)
-    yOffset = yOffset + 30
-    
-    -- Добавляем других игроков из глобальной таблицы
-    local onlineCount = 1
-    for sessionId, sessionData in pairs(_G.GGH_CHAT_GLOBAL.Sessions) do
-        if sessionId ~= MY_ID and sessionData.Active and (tick() - sessionData.LastPing) < 10 then
-            onlineCount = onlineCount + 1
-            
-            local playerEntry = PlayerTemplate:Clone()
-            playerEntry.Parent = PlayersList
-            playerEntry.Visible = true
-            playerEntry.Text = sessionData.PlayerName
-            playerEntry.TextColor3 = sessionData.Color
-            playerEntry.Position = UDim2.new(0, 5, 0, yOffset)
-            yOffset = yOffset + 30
-        end
-    end
-    
-    -- Обновляем заголовок
-    PlayersHeader.Text = string.format("PLAYERS ONLINE (%d)", onlineCount - 1)
-    Status.Text = string.format("Connected • Players: %d", onlineCount)
-end
-
-local function sendChatMessage(message)
-    if not message or #message == 0 or #message > 250 then return end
     
     -- Генерируем уникальный ID для сообщения
-    local messageId = MY_ID .. "_" .. tick()
+    local messageId = MY_PLAYER_ID .. "_" .. tick()
     
-    -- Добавляем локально
-    addMessageToChat(Player.Name, message, false, MyColor, messageId)
-    
-    -- Добавляем в глобальную таблицу
-    _G.GGH_CHAT_GLOBAL.LastMessageId = _G.GGH_CHAT_GLOBAL.LastMessageId + 1
-    _G.GGH_CHAT_GLOBAL.Messages[_G.GGH_CHAT_GLOBAL.LastMessageId] = {
+    -- Добавляем в общую таблицу
+    _G.GGH_SHARED_CHAT.Messages[messageId] = {
         Sender = Player.Name,
-        Message = message,
-        Color = MyColor,
-        Timestamp = os.date("%H:%M:%S"),
-        SessionId = MY_ID,
-        MessageId = _G.GGH_CHAT_GLOBAL.LastMessageId
+        Message = text,
+        Color = MY_COLOR,
+        Timestamp = os.time(),
+        IsSystem = false,
+        MessageId = messageId,
+        PlayerId = MY_PLAYER_ID
     }
+    
+    _G.GGH_SHARED_CHAT.LastUpdate = tick()
+    
+    -- Отображаем локально
+    addMessage(Player.Name, text, MY_COLOR, false, messageId)
     
     ChatInput.Text = ""
     ChatInput:CaptureFocus()
 end
 
+local function updatePlayerList()
+    -- Подсчитываем активных игроков
+    local activeCount = 0
+    local currentTime = tick()
+    
+    for playerId, playerData in pairs(_G.GGH_SHARED_CHAT.Players) do
+        if currentTime - playerData.LastActive < 10 then
+            activeCount = activeCount + 1
+        end
+    end
+    
+    PlayerCount.Text = "Players: " .. activeCount
+    
+    -- Обновляем свой статус активности
+    _G.GGH_SHARED_CHAT.Players[MY_PLAYER_ID].LastActive = currentTime
+    _G.GGH_SHARED_CHAT.Players[MY_PLAYER_ID].Active = true
+end
+
 local function checkNewMessages()
-    -- Проверяем новые сообщения в глобальной таблице
-    for messageId, messageData in pairs(_G.GGH_CHAT_GLOBAL.Messages) do
-        if not ReceivedMessageIds[messageId] and messageData.Sender ~= Player.Name then
-            -- Проверяем активен ли отправитель
-            local senderSession = _G.GGH_CHAT_GLOBAL.Sessions[messageData.SessionId]
-            if senderSession and senderSession.Active then
-                addMessageToChat(
-                    messageData.Sender,
-                    messageData.Message,
-                    false,
-                    messageData.Color,
-                    messageId
-                )
+    local currentTime = tick()
+    
+    -- Проверяем новые сообщения в общей таблице
+    for messageId, messageData in pairs(_G.GGH_SHARED_CHAT.Messages) do
+        -- Проверяем, не старое ли сообщение (больше 1 минуты)
+        if currentTime - messageData.Timestamp < 60 then
+            -- Проверяем, не наше ли это сообщение
+            if messageData.PlayerId ~= MY_PLAYER_ID then
+                -- Проверяем, не отображали ли уже
+                if not displayedMessages[messageId] then
+                    -- Проверяем, активен ли отправитель
+                    local senderData = _G.GGH_SHARED_CHAT.Players[messageData.PlayerId]
+                    if senderData and (currentTime - senderData.LastActive < 10) then
+                        addMessage(
+                            messageData.Sender,
+                            messageData.Message,
+                            messageData.Color,
+                            false,
+                            messageId
+                        )
+                    end
+                end
             end
         end
     end
 end
 
-local function updateActivePlayers()
-    -- Обновляем свой статус
-    _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].LastPing = tick()
-    _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].Active = true
+local function cleanupOldData()
+    local currentTime = tick()
+    local removedCount = 0
     
-    -- Проверяем других игроков
-    for sessionId, sessionData in pairs(_G.GGH_CHAT_GLOBAL.Sessions) do
-        if sessionId ~= MY_ID then
-            if tick() - sessionData.LastPing > 30 then
-                sessionData.Active = false
-            end
+    -- Удаляем старые сообщения (старше 5 минут)
+    for messageId, messageData in pairs(_G.GGH_SHARED_CHAT.Messages) do
+        if currentTime - messageData.Timestamp > 300 then
+            _G.GGH_SHARED_CHAT.Messages[messageId] = nil
+            removedCount = removedCount + 1
         end
     end
     
-    updatePlayersList()
-end
-
-local function clearChat()
-    for _, child in pairs(MessagesScroll:GetChildren()) do
-        if child:IsA("TextLabel") and child ~= MessageTemplate then
-            child:Destroy()
+    -- Удаляем неактивных игроков (неактивны больше 30 секунд)
+    for playerId, playerData in pairs(_G.GGH_SHARED_CHAT.Players) do
+        if currentTime - playerData.LastActive > 30 then
+            _G.GGH_SHARED_CHAT.Players[playerId] = nil
         end
     end
-    MyMessages = {}
-    ReceivedMessageIds = {}
-    addMessageToChat("SYSTEM", "Chat cleared", true)
-end
-
-local function toggleMinimize()
-    if MainFrame.Visible then
-        MainFrame.Visible = false
-        MinimizedFrame.Visible = true
-        MinimizedFrame.Position = MainFrame.Position
-        MinimizedFrame.Size = UDim2.new(0, 160, 0, 40)
-    else
-        MainFrame.Visible = true
-        MinimizedFrame.Visible = false
+    
+    if removedCount > 0 then
+        _G.GGH_SHARED_CHAT.LastUpdate = currentTime
     end
 end
 
--- Привязка событий
+local function initChat()
+    -- Добавляем приветственные сообщения
+    addMessage("SYSTEM", "GGH Chat v5.0 activated!", Color3.fromRGB(255, 200, 0), true, "sys_init")
+    addMessage("SYSTEM", "Connected to shared chat network", Color3.fromRGB(255, 200, 0), true, "sys_conn")
+    addMessage("SYSTEM", "Other players will appear automatically", Color3.fromRGB(255, 200, 0), true, "sys_players")
+end
+
+-- Обработчики событий
 SendButton.MouseButton1Click:Connect(function()
-    sendChatMessage(ChatInput.Text)
+    sendMessage(ChatInput.Text)
 end)
 
 ChatInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
-        sendChatMessage(ChatInput.Text)
+        sendMessage(ChatInput.Text)
     end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].Active = false
+    _G.GGH_SHARED_CHAT.Players[MY_PLAYER_ID].Active = false
     ScreenGui:Destroy()
 end)
-
-MinimizeBtn.MouseButton1Click:Connect(toggleMinimize)
-OpenButton.MouseButton1Click:Connect(toggleMinimize)
 
 -- Горячие клавиши
 game:GetService("UserInputService").InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.Slash then
         ChatInput:CaptureFocus()
     elseif input.KeyCode == Enum.KeyCode.Return and ChatInput:IsFocused() then
-        sendChatMessage(ChatInput.Text)
+        sendMessage(ChatInput.Text)
     elseif input.KeyCode == Enum.KeyCode.Escape then
         ChatInput:ReleaseFocus()
-    elseif input.KeyCode == Enum.KeyCode.L and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        clearChat()
-    elseif input.KeyCode == Enum.KeyCode.M and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        toggleMinimize()
     end
 end)
 
 -- Анимации кнопок
 CloseBtn.MouseEnter:Connect(function()
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+    TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}):Play()
 end)
 
 CloseBtn.MouseLeave:Connect(function()
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 60, 60)}):Play()
 end)
 
 SendButton.MouseEnter:Connect(function()
-    SendButton.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+    TweenService:Create(SendButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 180, 255)}):Play()
 end)
 
 SendButton.MouseLeave:Connect(function()
-    SendButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    TweenService:Create(SendButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 255)}):Play()
 end)
 
 -- Инициализация
-addMessageToChat("SYSTEM", "GGH Chat v4.0 initialized", true)
-addMessageToChat("SYSTEM", "Scanning for other players...", true)
-addMessageToChat("SYSTEM", "Use / to focus chat, Ctrl+L to clear, Ctrl+M to minimize", true)
-
--- Обновляем список игроков
-updatePlayersList()
+initChat()
 
 -- Главный цикл обновления
 spawn(function()
-    while wait(1) and ScreenGui.Parent do
-        updateActivePlayers()
+    while wait(0.5) do
+        if not ScreenGui.Parent then break end
+        
+        updatePlayerList()
         checkNewMessages()
+        
+        -- Периодическая очистка старых данных
+        if tick() % 30 < 0.5 then
+            cleanupOldData()
+        end
     end
 end)
 
--- Периодический ping
+-- Уведомление о входе
 spawn(function()
-    while wait(5) and ScreenGui.Parent do
-        _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].LastPing = tick()
-        _G.GGH_CHAT_GLOBAL.Sessions[MY_ID].Active = true
-    end
+    wait(2)
+    local joinId = "join_" .. MY_PLAYER_ID
+    _G.GGH_SHARED_CHAT.Messages[joinId] = {
+        Sender = "SYSTEM",
+        Message = Player.Name .. " joined the chat",
+        Color = Color3.fromRGB(0, 255, 150),
+        Timestamp = os.time(),
+        IsSystem = true,
+        MessageId = joinId,
+        PlayerId = MY_PLAYER_ID
+    }
+    
+    addMessage("SYSTEM", Player.Name .. " joined the chat", Color3.fromRGB(0, 255, 150), true, joinId)
 end)
 
--- Тестовое сообщение через 3 секунды
-spawn(function()
-    wait(3)
-    addMessageToChat("SYSTEM", "Ready! Other players will appear here automatically", true)
-end)
+print("=================================================================")
+print("GGH CHAT v5.0 - ACTIVE AND WORKING")
+print("Player ID: " .. MY_PLAYER_ID)
+print("Color: " .. tostring(MY_COLOR))
+print("=================================================================")
+print("Все игроки с этим скриптом видят друг друга через _G.GGH_SHARED_CHAT")
+print("Сообщения передаются мгновенно без дублирования")
+print("=================================================================")
 
-print("========================================")
-print("GGH CHAT v4.0 - ACTIVE")
-print("Session ID: " .. MY_ID)
-print("Your color: " .. tostring(MyColor))
-print("Messages will not duplicate")
-print("========================================")
-
--- Экспортируем API
+-- Возвращаем API для внешнего использования
 return {
-    SendMessage = sendChatMessage,
-    ClearChat = clearChat,
-    GetPlayers = function()
+    SendMessage = sendMessage,
+    GetActivePlayers = function()
         local players = {}
-        for _, session in pairs(_G.GGH_CHAT_GLOBAL.Sessions) do
-            if session.Active then
-                table.insert(players, session.PlayerName)
+        local currentTime = tick()
+        
+        for playerId, playerData in pairs(_G.GGH_SHARED_CHAT.Players) do
+            if currentTime - playerData.LastActive < 10 then
+                table.insert(players, {
+                    Name = playerData.Name,
+                    Color = playerData.Color
+                })
             end
         end
+        
         return players
     end
 }
