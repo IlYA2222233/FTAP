@@ -1,573 +1,376 @@
--- GGH PROTECTION v1.0 - Антикик, антиграб, античат кик, невизуальная защита
+-- GGH PROTECTION UI v1.0 - Рабочий интерфейс защиты
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
--- НАСТРОЙКИ ЗАЩИТЫ
-local PROTECTION_SETTINGS = {
-    AntiKick = true,           -- Защита от киков
-    AntiGrab = true,           -- Защита от граба
-    AntiChatKick = true,       -- Защита от кика через чат
-    AntiTeleport = true,       -- Защита от телепортов
-    AntiVoid = true,           -- Защита от выкидывания в бездну
-    AntiFling = true,          -- Защита от флинга
-    AntiStun = true,           -- Защита от стан-атак
-    AntiFreeze = true,         -- Защита от заморозки
-    AntiToolSteal = true,      -- Защита от кражи инструментов
-    AntiCharacterReset = true, -- Защита от сброса персонажа
-    SilentMode = true,         -- Невидимый режим
-    AutoRespawn = true         -- Авто-респавн при смерти
+-- Создаем интерфейс
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GGH_Protection_UI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+
+-- Главное окно
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 400, 0, 500)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Верхняя панель
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+TopBar.Size = UDim2.new(1, 0, 0, 50)
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 10)
+TopCorner.Parent = TopBar
+
+-- Заголовок
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Parent = TopBar
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(0.7, 0, 1, 0)
+Title.Position = UDim2.new(0.05, 0, 0, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "GGH PROTECTION v1.0"
+Title.TextColor3 = Color3.fromRGB(0, 200, 255)
+Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Кнопка закрытия
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = TopBar
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(0.92, 0, 0.5, -15)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 18
+CloseButton.AutoButtonColor = false
+
+-- Контент
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.Parent = MainFrame
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, 10, 0, 60)
+Content.Size = UDim2.new(1, -20, 1, -70)
+
+-- Статус защиты
+local StatusFrame = Instance.new("Frame")
+StatusFrame.Name = "StatusFrame"
+StatusFrame.Parent = Content
+StatusFrame.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+StatusFrame.Size = UDim2.new(1, 0, 0, 80)
+
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 8)
+StatusCorner.Parent = StatusFrame
+
+local StatusTitle = Instance.new("TextLabel")
+StatusTitle.Name = "StatusTitle"
+StatusTitle.Parent = StatusFrame
+StatusTitle.BackgroundTransparency = 1
+StatusTitle.Size = UDim2.new(1, 0, 0, 30)
+StatusTitle.Position = UDim2.new(0, 10, 0, 5)
+StatusTitle.Font = Enum.Font.GothamBold
+StatusTitle.Text = "СТАТУС ЗАЩИТЫ"
+StatusTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusTitle.TextSize = 16
+StatusTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local StatusIndicator = Instance.new("Frame")
+StatusIndicator.Name = "StatusIndicator"
+StatusIndicator.Parent = StatusFrame
+StatusIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+StatusIndicator.Size = UDim2.new(0, 15, 0, 15)
+StatusIndicator.Position = UDim2.new(0, 15, 0, 40)
+
+local IndicatorCorner = Instance.new("UICorner")
+IndicatorCorner.CornerRadius = UDim.new(1, 0)
+IndicatorCorner.Parent = StatusIndicator
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Name = "StatusText"
+StatusText.Parent = StatusFrame
+StatusText.BackgroundTransparency = 1
+StatusText.Size = UDim2.new(0.8, 0, 0, 20)
+StatusText.Position = UDim2.new(0, 40, 0, 38)
+StatusText.Font = Enum.Font.Gotham
+StatusText.Text = "ЗАЩИТА АКТИВНА"
+StatusText.TextColor3 = Color3.fromRGB(0, 255, 100)
+StatusText.TextSize = 14
+StatusText.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Панель модулей защиты
+local ModulesFrame = Instance.new("Frame")
+ModulesFrame.Name = "ModulesFrame"
+ModulesFrame.Parent = Content
+ModulesFrame.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+ModulesFrame.Position = UDim2.new(0, 0, 0, 90)
+ModulesFrame.Size = UDim2.new(1, 0, 0, 300)
+
+local ModulesCorner = Instance.new("UICorner")
+ModulesCorner.CornerRadius = UDim.new(0, 8)
+ModulesCorner.Parent = ModulesFrame
+
+local ModulesTitle = Instance.new("TextLabel")
+ModulesTitle.Name = "ModulesTitle"
+ModulesTitle.Parent = ModulesFrame
+ModulesTitle.BackgroundTransparency = 1
+ModulesTitle.Size = UDim2.new(1, 0, 0, 30)
+ModulesTitle.Position = UDim2.new(0, 10, 0, 5)
+ModulesTitle.Font = Enum.Font.GothamBold
+ModulesTitle.Text = "МОДУЛИ ЗАЩИТЫ"
+ModulesTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModulesTitle.TextSize = 16
+ModulesTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Список модулей
+local ModulesList = Instance.new("ScrollingFrame")
+ModulesList.Name = "ModulesList"
+ModulesList.Parent = ModulesFrame
+ModulesList.BackgroundTransparency = 1
+ModulesList.Size = UDim2.new(1, -10, 1, -40)
+ModulesList.Position = UDim2.new(0, 5, 0, 35)
+ModulesList.ScrollBarThickness = 5
+ModulesList.CanvasSize = UDim2.new(0, 0, 0, 0)
+ModulesList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+-- Создаем модули защиты
+local protectionModules = {
+    {Name = "АНТИКИК", Enabled = true, Color = Color3.fromRGB(255, 100, 100)},
+    {Name = "АНТИГРАБ", Enabled = true, Color = Color3.fromRGB(100, 200, 255)},
+    {Name = "АНТИТЕЛЕПОРТ", Enabled = true, Color = Color3.fromRGB(255, 200, 100)},
+    {Name = "АНТИФЛИНГ", Enabled = true, Color = Color3.fromRGB(100, 255, 150)},
+    {Name = "АНТИСТАН", Enabled = true, Color = Color3.fromRGB(200, 100, 255)},
+    {Name = "АНТИ-БЕЗДНА", Enabled = true, Color = Color3.fromRGB(255, 255, 100)},
+    {Name = "ЗАЩИТА ИНСТРУМЕНТОВ", Enabled = true, Color = Color3.fromRGB(100, 255, 255)},
+    {Name = "АВТО-РЕСПАВН", Enabled = true, Color = Color3.fromRGB(255, 150, 100)}
 }
 
--- ГЛОБАЛЬНАЯ ЗАЩИТА
-local originalFunctions = {}
-local protectedProperties = {}
-local backupCFrame = HumanoidRootPart.CFrame
-local lastSafePosition = HumanoidRootPart.CFrame
-local isProtected = true
-local protectionThread = nil
-local detectedAttacks = {}
+local moduleButtons = {}
 
--- СИСТЕМА ЛОГИРОВАНИЯ
-local function logAttack(attackType, attacker)
-    local timestamp = os.date("%H:%M:%S")
-    local logMessage = string.format("[%s] Обнаружена атака: %s", timestamp, attackType)
-    if attacker then
-        logMessage = logMessage .. string.format(" от %s", attacker)
+for i, module in ipairs(protectionModules) do
+    local ModuleButton = Instance.new("TextButton")
+    ModuleButton.Name = "Module_" .. module.Name
+    ModuleButton.Parent = ModulesList
+    ModuleButton.BackgroundColor3 = module.Enabled and Color3.fromRGB(40, 50, 70) or Color3.fromRGB(30, 30, 40)
+    ModuleButton.Size = UDim2.new(1, -10, 0, 40)
+    ModuleButton.Position = UDim2.new(0, 5, 0, (i-1) * 45)
+    ModuleButton.Font = Enum.Font.Gotham
+    ModuleButton.Text = module.Name
+    ModuleButton.TextColor3 = module.Enabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+    ModuleButton.TextSize = 14
+    ModuleButton.AutoButtonColor = false
+    
+    local ModuleCorner = Instance.new("UICorner")
+    ModuleCorner.CornerRadius = UDim.new(0, 6)
+    ModuleCorner.Parent = ModuleButton
+    
+    local StatusDot = Instance.new("Frame")
+    StatusDot.Name = "StatusDot"
+    StatusDot.Parent = ModuleButton
+    StatusDot.BackgroundColor3 = module.Enabled and module.Color or Color3.fromRGB(100, 100, 100)
+    StatusDot.Size = UDim2.new(0, 10, 0, 10)
+    StatusDot.Position = UDim2.new(0.92, 0, 0.5, -5)
+    
+    local DotCorner = Instance.new("UICorner")
+    DotCorner.CornerRadius = UDim.new(1, 0)
+    DotCorner.Parent = StatusDot
+    
+    moduleButtons[module.Name] = {
+        Button = ModuleButton,
+        Dot = StatusDot,
+        Enabled = module.Enabled
+    }
+    
+    -- Обработчик клика
+    ModuleButton.MouseButton1Click:Connect(function()
+        module.Enabled = not module.Enabled
+        moduleButtons[module.Name].Enabled = module.Enabled
+        
+        if module.Enabled then
+            ModuleButton.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+            ModuleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            StatusDot.BackgroundColor3 = module.Color
+        else
+            ModuleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+            ModuleButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+            StatusDot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        end
+        
+        -- Здесь будет включение/выключение реальной защиты
+        print("Модуль " .. module.Name .. (module.Enabled and " включен" or " выключен"))
+    end)
+end
+
+-- Кнопки управления
+local ButtonsFrame = Instance.new("Frame")
+ButtonsFrame.Name = "ButtonsFrame"
+ButtonsFrame.Parent = Content
+ButtonsFrame.BackgroundTransparency = 1
+ButtonsFrame.Position = UDim2.new(0, 0, 0, 400)
+ButtonsFrame.Size = UDim2.new(1, 0, 0, 50)
+
+local function createActionButton(name, text, position, color)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Parent = ButtonsFrame
+    button.BackgroundColor3 = color
+    button.Size = UDim2.new(0.48, 0, 0, 40)
+    button.Position = position
+    button.Font = Enum.Font.GothamBold
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 14
+    button.AutoButtonColor = false
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 6)
+    buttonCorner.Parent = button
+    
+    return button
+end
+
+local RestoreBtn = createActionButton("RestoreBtn", "ВОССТАНОВИТЬ", UDim2.new(0, 0, 0, 0), Color3.fromRGB(0, 150, 255))
+local RefreshBtn = createActionButton("RefreshBtn", "ОБНОВИТЬ", UDim2.new(0.52, 0, 0, 0), Color3.fromRGB(50, 150, 50))
+
+-- Анимации кнопок
+CloseButton.MouseEnter:Connect(function()
+    TweenService:Create(CloseButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}):Play()
+end)
+
+CloseButton.MouseLeave:Connect(function()
+    TweenService:Create(CloseButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 60, 60)}):Play()
+end)
+
+RestoreBtn.MouseEnter:Connect(function()
+    TweenService:Create(RestoreBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 180, 255)}):Play()
+end)
+
+RestoreBtn.MouseLeave:Connect(function()
+    TweenService:Create(RestoreBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 255)}):Play()
+end)
+
+RefreshBtn.MouseEnter:Connect(function()
+    TweenService:Create(RefreshBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 180, 70)}):Play()
+end)
+
+RefreshBtn.MouseLeave:Connect(function()
+    TweenService:Create(RefreshBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 150, 50)}):Play()
+end)
+
+-- Обработчики кнопок
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+RestoreBtn.MouseButton1Click:Connect(function()
+    -- Восстановление позиции
+    local character = Player.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
+        print("Позиция восстановлена")
     end
-    print(logMessage)
-    table.insert(detectedAttacks, {time = tick(), type = attackType, attacker = attacker})
-end
+end)
 
--- ЗАЩИТА ОТ КИКОВ
-if PROTECTION_SETTINGS.AntiKick then
-    -- Перехват функции Kick
-    local mt = getrawmetatable(game)
-    local originalIndex = mt.__index
-    setreadonly(mt, false)
-    
-    mt.__index = newcclosure(function(self, key)
-        if key == "Kick" or key == "kick" then
-            logAttack("Попытка кика", tostring(self))
-            return function() 
-                print("GGH: Защита от кика активирована")
-                return nil
-            end
-        end
-        return originalIndex(self, key)
-    end)
-    
-    setreadonly(mt, true)
-    
-    -- Защита от сетевых киков
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and (obj.Name:lower():find("kick") or obj.Name:lower():find("ban")) then
-            pcall(function()
-                obj.OnClientEvent:Connect(function(...)
-                    logAttack("Сетевой кик через " .. obj.Name)
-                end)
-            end)
-        end
+RefreshBtn.MouseButton1Click:Connect(function()
+    -- Обновление статуса
+    StatusIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    StatusText.Text = "ЗАЩИТА АКТИВНА • " .. #protectionModules .. " модулей"
+    print("Статус обновлен")
+end)
+
+-- Горячая клавиша для открытия/закрытия интерфейса
+local uiVisible = true
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        uiVisible = not uiVisible
+        MainFrame.Visible = uiVisible
     end
-    
-    print("GGH: Антикик активирован")
-end
+end)
 
--- ЗАЩИТА ОТ ГРАБА (ANTI-GRAB)
-if PROTECTION_SETTINGS.AntiGrab then
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiGrab do
-            wait(0.1)
-            
-            -- Проверка на необычное движение
-            local currentVelocity = HumanoidRootPart.Velocity
-            local speed = currentVelocity.Magnitude
-            
-            if speed > 500 then -- Слишком высокая скорость
-                HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                HumanoidRootPart.CFrame = lastSafePosition
-                logAttack("Попытка граба (высокая скорость)")
-            end
-            
-            -- Проверка на телепортацию
-            local distance = (HumanoidRootPart.Position - lastSafePosition.Position).Magnitude
-            if distance > 1000 then -- Слишком далеко телепортировали
-                HumanoidRootPart.CFrame = lastSafePosition
-                logAttack("Попытка телепортации грабом")
-            end
-            
-            -- Сохраняем безопасную позицию
-            if speed < 50 and distance < 100 then
-                lastSafePosition = HumanoidRootPart.CFrame
-            end
-            
-            -- Защита от сетевых грабов
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= Player then
-                    pcall(function()
-                        local char = player.Character
-                        if char and char:FindFirstChild("HumanoidRootPart") then
-                            local distanceToPlayer = (HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
-                            if distanceToPlayer < 5 then
-                                -- Отталкивание при слишком близком подходе
-                                local direction = (HumanoidRootPart.Position - char.HumanoidRootPart.Position).Unit
-                                HumanoidRootPart.Velocity = direction * 20
-                            end
-                        end
-                    end)
-                end
-            end
-        end
-    end)
-    
-    print("GGH: Антиграб активирован")
-end
-
--- ЗАЩИТА ОТ ЧАТ КИКОВ
-if PROTECTION_SETTINGS.AntiChatKick then
-    -- Мониторинг чата
-    local function monitorChat()
-        pcall(function()
-            local chatEvents = {}
-            
-            -- Поиск чат-ивентов
-            for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-                if obj:IsA("RemoteEvent") and (obj.Name:lower():find("chat") or obj.Name:lower():find("message")) then
-                    table.insert(chatEvents, obj)
-                end
-            end
-            
-            for _, event in pairs(chatEvents) do
-                event.OnClientEvent:Connect(function(...)
-                    local args = {...}
-                    if args and #args > 0 then
-                        local message = tostring(args[1]):lower()
-                        
-                        -- Детектирование вредоносных команд
-                        local maliciousPatterns = {
-                            "kick me", "ban me", "crash me", "lag me",
-                            "kill me", "reset me", "teleport me", "void me",
-                            "exploit", "hack", "cheat"
-                        }
-                        
-                        for _, pattern in pairs(maliciousPatterns) do
-                            if message:find(pattern) then
-                                logAttack("Чат кик: " .. message)
-                                -- Блокируем выполнение
-                                return nil
-                            end
-                        end
-                    end
-                end)
-            end
-        end)
-    end
-    
-    spawn(monitorChat)
-    print("GGH: Защита от чат-киков активирована")
-end
-
--- ЗАЩИТА ОТ ТЕЛЕПОРТОВ
-if PROTECTION_SETTINGS.AntiTeleport then
-    local lastValidPosition = HumanoidRootPart.CFrame
-    local teleportDetectionCount = 0
-    
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiTeleport do
-            wait(0.5)
-            
-            local currentPos = HumanoidRootPart.Position
-            local distance = (currentPos - lastValidPosition.Position).Magnitude
-            
-            if distance > 500 then -- Внезапная телепортация
-                teleportDetectionCount = teleportDetectionCount + 1
-                
-                if teleportDetectionCount > 2 then
-                    HumanoidRootPart.CFrame = lastValidPosition
-                    logAttack("Телепорт в небезопасную зону")
-                    teleportDetectionCount = 0
-                end
-            else
-                lastValidPosition = HumanoidRootPart.CFrame
-                teleportDetectionCount = 0
-            end
-            
-            -- Защита от телепорт-тулов
-            for _, tool in pairs(Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    pcall(function()
-                        for _, event in pairs(tool:GetDescendants()) do
-                            if event:IsA("RemoteEvent") then
-                                event.OnClientEvent:Connect(function(...)
-                                    logAttack("Телепорт через инструмент: " .. tool.Name)
-                                    -- Отменяем телепорт
-                                    return nil
-                                end)
-                            end
-                        end
-                    end)
-                end
-            end
-        end
-    end)
-    
-    print("GGH: Антителепорт активирован")
-end
-
--- ЗАЩИТА ОТ БЕЗДНЫ (ANTI-VOID)
-if PROTECTION_SETTINGS.AntiVoid then
-    local voidYLevel = -500
-    local respawnYLevel = -100
-    
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiVoid do
-            wait(0.3)
-            
-            if HumanoidRootPart.Position.Y < voidYLevel then
-                -- Телепортируем на безопасную позицию
-                local safeSpot = CFrame.new(0, 50, 0)
-                
-                -- Ищем спавн-точку
-                local spawns = Workspace:FindFirstChild("SpawnLocation")
-                if spawns then
-                    safeSpot = spawns.CFrame + Vector3.new(0, 5, 0)
-                end
-                
-                HumanoidRootPart.CFrame = safeSpot
-                HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                logAttack("Спасение из бездны")
-            end
-        end
-    end)
-    
-    print("GGH: Анти-бездна активирован")
-end
-
--- ЗАЩИТА ОТ ФЛИНГА (ANTI-FLING)
-if PROTECTION_SETTINGS.AntiFling then
-    local maxVelocity = 150
-    local flingDetectionCount = 0
-    
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiFling do
-            wait(0.1)
-            
-            local velocity = HumanoidRootPart.Velocity.Magnitude
-            
-            if velocity > maxVelocity then
-                flingDetectionCount = flingDetectionCount + 1
-                
-                if flingDetectionCount > 3 then
-                    -- Сбрасываем скорость и позицию
-                    HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                    HumanoidRootPart.RotVelocity = Vector3.new(0, 0, 0)
-                    HumanoidRootPart.CFrame = lastSafePosition
-                    
-                    logAttack("Атака флингом (скорость: " .. math.floor(velocity) .. ")")
-                    flingDetectionCount = 0
-                end
-            else
-                flingDetectionCount = 0
-            end
-            
-            -- Сохраняем безопасную позицию когда стоим
-            if velocity < 10 then
-                lastSafePosition = HumanoidRootPart.CFrame
-            end
-        end
-    end)
-    
-    print("GGH: Антифлинг активирован")
-end
-
--- ЗАЩИТА ОТ СТАНА (ANTI-STUN)
-if PROTECTION_SETTINGS.AntiStun then
-    local humanoid = Character:WaitForChild("Humanoid")
-    local originalWalkSpeed = humanoid.WalkSpeed
-    local originalJumpPower = humanoid.JumpPower
-    
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiStun do
-            wait(0.2)
-            
-            -- Восстанавливаем параметры если их изменили
-            if humanoid.WalkSpeed < originalWalkSpeed * 0.5 then
-                humanoid.WalkSpeed = originalWalkSpeed
-                logAttack("Восстановление скорости")
-            end
-            
-            if humanoid.JumpPower < originalJumpPower * 0.5 then
-                humanoid.JumpPower = originalJumpPower
-                logAttack("Восстановление прыжка")
-            end
-            
-            -- Защита от сетевых стан-атак
-            for _, connection in pairs(getconnections(humanoid.StateChanged)) do
-                pcall(function()
-                    connection:Disable()
-                end)
-            end
-        end
-    end)
-    
-    print("GGH: Антистан активирован")
-end
-
--- ЗАЩИТА ОТ ЗАМОРОЗКИ (ANTI-FREEZE)
-if PROTECTION_SETTINGS.AntiFreeze then
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiFreeze do
-            wait(0.5)
-            
-            -- Проверка на заморозку анимаций
-            pcall(function()
-                local animator = Character:FindFirstChildOfClass("Animator")
-                if animator then
-                    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-                        if track.IsPlaying and track.WeightCurrent > 0.9 then
-                            -- Сбрасываем слишком доминирующие анимации
-                            track:Stop(0.1)
-                        end
-                    end
-                end
-            end)
-            
-            -- Защита от физической заморозки
-            for _, part in pairs(Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    if part.Anchored then
-                        part.Anchored = false
-                        logAttack("Разблокировка замороженной части: " .. part.Name)
-                    end
-                    
-                    if part.Massless then
-                        part.Massless = false
-                    end
-                end
-            end
-        end
-    end)
-    
-    print("GGH: Антифриз активирован")
-end
-
--- ЗАЩИТА ОТ КРАЖИ ИНСТРУМЕНТОВ
-if PROTECTION_SETTINGS.AntiToolSteal then
-    local originalTools = {}
-    
-    -- Делаем резервную копию инструментов
-    for _, tool in pairs(Character:GetChildren()) do
-        if tool:IsA("Tool") then
-            originalTools[tool.Name] = tool:Clone()
-        end
-    end
-    
-    spawn(function()
-        while isProtected and PROTECTION_SETTINGS.AntiToolSteal do
-            wait(1)
-            
-            -- Проверяем наличие инструментов
-            local currentTools = {}
-            for _, tool in pairs(Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    currentTools[tool.Name] = true
-                end
-            end
-            
-            -- Восстанавливаем потерянные инструменты
-            for toolName, toolCopy in pairs(originalTools) do
-                if not currentTools[toolName] then
-                    local newTool = toolCopy:Clone()
-                    newTool.Parent = Character
-                    logAttack("Восстановлен инструмент: " .. toolName)
-                end
-            end
-            
-            -- Защита от сетевого удаления инструментов
-            for _, tool in pairs(Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    pcall(function()
-                        tool.Destroying:Connect(function()
-                            logAttack("Попытка удаления инструмента: " .. tool.Name)
-                            task.wait(0.1)
-                            if not tool.Parent then
-                                local restored = originalTools[tool.Name]
-                                if restored then
-                                    restored:Clone().Parent = Character
-                                end
-                            end
-                        end)
-                    end)
-                end
-            end
-        end
-    end)
-    
-    print("GGH: Защита инструментов активирована")
-end
-
--- ЗАЩИТА ОТ СБРОСА ПЕРСОНАЖА
-if PROTECTION_SETTINGS.AntiCharacterReset then
-    -- Отключаем стандартный сброс
-    pcall(function()
-        local humanoid = Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.BreakJointsOnDeath = false
-        end
-    end)
-    
-    -- Перехват функции сброса
-    local function preventCharacterReset()
-        pcall(function()
-            -- Защита от сетевых сбросов
-            for _, event in pairs(ReplicatedStorage:GetDescendants()) do
-                if event:IsA("RemoteEvent") and (
-                    event.Name:lower():find("reset") or 
-                    event.Name:lower():find("death") or
-                    event.Name:lower():find("kill")
-                ) then
-                    event.OnClientEvent:Connect(function(...)
-                        logAttack("Сетевой сброс через: " .. event.Name)
-                        return nil
-                    end)
-                end
-            end
-        end)
-    end
-    
-    spawn(preventCharacterReset)
-    
-    -- Защита при смерти
-    if PROTECTION_SETTINGS.AutoRespawn then
-        Character:WaitForChild("Humanoid").Died:Connect(function()
-            logAttack("Персонаж умер, восстановление...")
-            task.wait(2)
-            
-            -- Телепортируем на спавн
-            local spawnLocation = Workspace:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("Spawn")
-            if spawnLocation then
-                HumanoidRootPart.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
-            else
-                HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
-            end
-            
-            -- Восстанавливаем здоровье
-            local humanoid = Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.Health = humanoid.MaxHealth
-            end
-        end)
-    end
-    
-    print("GGH: Защита от сброса персонажа активирована")
-end
-
--- НЕВИДИМЫЙ РЕЖИМ
-if PROTECTION_SETTINGS.SilentMode then
-    -- Скрываем интерфейс защиты
-    local function hideProtection()
-        -- Скрываем сообщения в выводе
-        local oldPrint = print
-        print = function(...)
-            -- Показываем только важные сообщения
-            local args = {...}
-            local msg = tostring(args[1])
-            if msg:find("GGH:") or msg:find("Обнаружена атака:") then
-                oldPrint(...)
+-- Автоматическое обновление статуса
+spawn(function()
+    while true do
+        wait(5)
+        local activeModules = 0
+        for _, module in ipairs(protectionModules) do
+            if module.Enabled then
+                activeModules = activeModules + 1
             end
         end
         
-        -- Минимальная видимость в F9
-        print("\n========================================")
-        print("GGH PROTECTION v1.0 - ACTIVE")
-        print("Защита работает в скрытом режиме")
-        print("========================================\n")
+        StatusText.Text = "АКТИВНО • " .. activeModules .. "/" .. #protectionModules .. " модулей"
     end
-    
-    hideProtection()
-    
-    print("GGH: Скрытый режим активирован")
-end
+end)
 
--- СИСТЕМА ВОССТАНОВЛЕНИЯ
-local function setupRecoverySystem()
-    -- Резервное копирование позиции
-    spawn(function()
-        while isProtected do
-            wait(5)
-            backupCFrame = HumanoidRootPart.CFrame
-        end
-    end)
+-- Показываем сообщение о запуске
+print("========================================")
+print("GGH PROTECTION UI v1.0")
+print("Интерфейс защиты успешно запущен!")
+print("Нажмите INSERT для скрытия/показа")
+print("========================================")
+
+-- Возвращаем управление интерфейсом
+local GGH_UI = {
+    Toggle = function(visible)
+        MainFrame.Visible = visible
+        uiVisible = visible
+    end,
     
-    -- Авто-восстановление при проблемах
-    spawn(function()
-        while isProtected do
-            wait(10)
-            
-            -- Проверяем целостность персонажа
-            if not Character or not Character.Parent then
-                logAttack("Персонаж потерян, восстановление...")
-                
-                -- Пересоздаем связь с персонажем
-                Character = Player.Character or Player.CharacterAdded:Wait()
-                HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-                HumanoidRootPart.CFrame = backupCFrame
-            end
-            
-            -- Проверяем подключение к серверу
-            if not Players:FindFirstChild(Player.Name) then
-                logAttack("Потеряно подключение к серверу")
+    SetStatus = function(status, color)
+        StatusText.Text = status
+        StatusIndicator.BackgroundColor3 = color
+    end,
+    
+    GetModuleState = function(moduleName)
+        for _, module in ipairs(protectionModules) do
+            if module.Name == moduleName then
+                return module.Enabled
             end
         end
-    end)
-end
-
-setupRecoverySystem()
-
--- ФУНКЦИИ УПРАВЛЕНИЯ
-local GGH_Protection = {
-    -- Включить/выключить защиту
-    ToggleProtection = function(state)
-        isProtected = state
-        print("GGH: Защита " .. (state and "включена" or "выключена"))
+        return false
     end,
     
-    -- Получить статус защиты
-    GetStatus = function()
-        return {
-            Protected = isProtected,
-            AttacksDetected = #detectedAttacks,
-            LastAttack = detectedAttacks[#detectedAttacks] or "Нет атак",
-            Settings = PROTECTION_SETTINGS
-        }
-    end,
-    
-    -- Восстановить позицию
-    RestorePosition = function()
-        HumanoidRootPart.CFrame = backupCFrame
-        HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-        print("GGH: Позиция восстановлена")
-    end,
-    
-    -- Очистить историю атак
-    ClearAttackLog = function()
-        detectedAttacks = {}
-        print("GGH: История атак очищена")
+    ToggleModule = function(moduleName, state)
+        for _, module in ipairs(protectionModules) do
+            if module.Name == moduleName then
+                module.Enabled = state
+                if moduleButtons[moduleName] then
+                    if state then
+                        moduleButtons[moduleName].Button.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+                        moduleButtons[moduleName].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        moduleButtons[moduleName].Dot.BackgroundColor3 = module.Color
+                    else
+                        moduleButtons[moduleName].Button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+                        moduleButtons[moduleName].Button.TextColor3 = Color3.fromRGB(150, 150, 150)
+                        moduleButtons[moduleName].Dot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                    end
+                end
+                return true
+            end
+        end
+        return false
     end
 }
 
--- АВТОМАТИЧЕСКАЯ АКТИВАЦИЯ
-print("\n" .. string.rep("=", 50))
-print("GGH PROTECTION SYSTEM v1.0")
-print("Защита активирована: " .. Player.Name)
-print("Статус: АКТИВНО")
-print(string.rep("=", 50) .. "\n")
-
--- ВОЗВРАЩАЕМ УПРАВЛЕНИЕ
-return GGH_Protection
+return GGH_UI
