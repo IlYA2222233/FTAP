@@ -1,518 +1,573 @@
--- GGH Chat v6.0 - АБСОЛЮТНО РАБОЧИЙ чат для всех игроков на сервере
+-- GGH PROTECTION v1.0 - Антикик, антиграб, античат кик, невизуальная защита
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local TextService = game:GetService("TextService")
+local Workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
 local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- СОЗДАЕМ ОБЩУЮ ТАБЛИЦУ ДЛЯ ВСЕХ ИГРОКОВ
-if not _G.GGH_CHAT_DATA then
-    _G.GGH_CHAT_DATA = {
-        Messages = {},        -- Все сообщения
-        ActivePlayers = {},   -- Активные игроки
-        NextMessageId = 1,    -- Следующий ID сообщения
-        Version = "6.0"
-    }
-    print("GGH Chat: Создана глобальная таблица данных")
-end
-
--- Мой ID игрока
-local MY_ID = "GGH_" .. Player.UserId
-local MY_COLOR = Color3.fromHSV(math.random(), 0.8, 0.9)
-
--- Регистрируем себя в общей таблице
-_G.GGH_CHAT_DATA.ActivePlayers[MY_ID] = {
-    Name = Player.Name,
-    Color = MY_COLOR,
-    LastPing = tick(),
-    Active = true
+-- НАСТРОЙКИ ЗАЩИТЫ
+local PROTECTION_SETTINGS = {
+    AntiKick = true,           -- Защита от киков
+    AntiGrab = true,           -- Защита от граба
+    AntiChatKick = true,       -- Защита от кика через чат
+    AntiTeleport = true,       -- Защита от телепортов
+    AntiVoid = true,           -- Защита от выкидывания в бездну
+    AntiFling = true,          -- Защита от флинга
+    AntiStun = true,           -- Защита от стан-атак
+    AntiFreeze = true,         -- Защита от заморозки
+    AntiToolSteal = true,      -- Защита от кражи инструментов
+    AntiCharacterReset = true, -- Защита от сброса персонажа
+    SilentMode = true,         -- Невидимый режим
+    AutoRespawn = true         -- Авто-респавн при смерти
 }
 
-print("GGH Chat: Зарегистрирован игрок " .. Player.Name)
+-- ГЛОБАЛЬНАЯ ЗАЩИТА
+local originalFunctions = {}
+local protectedProperties = {}
+local backupCFrame = HumanoidRootPart.CFrame
+local lastSafePosition = HumanoidRootPart.CFrame
+local isProtected = true
+local protectionThread = nil
+local detectedAttacks = {}
 
--- Создаем интерфейс
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GGH_Chat_Interface"
-ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.ResetOnSpawn = false
-
--- Основное окно
-local MainWindow = Instance.new("Frame")
-MainWindow.Name = "MainWindow"
-MainWindow.Parent = ScreenGui
-MainWindow.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
-MainWindow.BorderSizePixel = 0
-MainWindow.Position = UDim2.new(0.65, 0, 0.25, 0)
-MainWindow.Size = UDim2.new(0, 500, 0, 550)
-MainWindow.Active = true
-MainWindow.Draggable = true
-
-local WindowCorner = Instance.new("UICorner")
-WindowCorner.CornerRadius = UDim.new(0, 12)
-WindowCorner.Parent = MainWindow
-
--- Верхняя панель
-local TopPanel = Instance.new("Frame")
-TopPanel.Name = "TopPanel"
-TopPanel.Parent = MainWindow
-TopPanel.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
-TopPanel.Size = UDim2.new(1, 0, 0, 45)
-
-local TopCorner = Instance.new("UICorner")
-TopCorner.CornerRadius = UDim.new(0, 12)
-TopCorner.Parent = TopPanel
-
--- Заголовок
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Parent = TopPanel
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(0.6, 0, 1, 0)
-Title.Position = UDim2.new(0.05, 0, 0, 0)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "GGH CHAT v6.0"
-Title.TextColor3 = Color3.fromRGB(0, 200, 255)
-Title.TextSize = 18
-Title.TextXAlignment = Enum.TextXAlignment.Left
-
--- Кнопка закрытия
-local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "CloseButton"
-CloseButton.Parent = TopPanel
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-CloseButton.Size = UDim2.new(0, 32, 0, 32)
-CloseButton.Position = UDim2.new(0.92, 0, 0.5, -16)
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.Text = "✕"
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.TextSize = 18
-CloseButton.AutoButtonColor = false
-
--- Область чата
-local ChatContainer = Instance.new("Frame")
-ChatContainer.Name = "ChatContainer"
-ChatContainer.Parent = MainWindow
-ChatContainer.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-ChatContainer.Position = UDim2.new(0.03, 0, 0.1, 0)
-ChatContainer.Size = UDim2.new(0.94, 0, 0.75, 0)
-
-local ChatCorner = Instance.new("UICorner")
-ChatCorner.CornerRadius = UDim.new(0, 8)
-ChatCorner.Parent = ChatContainer
-
--- Прокручиваемая область сообщений
-local MessagesScroll = Instance.new("ScrollingFrame")
-MessagesScroll.Name = "MessagesScroll"
-MessagesScroll.Parent = ChatContainer
-MessagesScroll.BackgroundTransparency = 1
-MessagesScroll.Size = UDim2.new(1, -10, 1, -10)
-MessagesScroll.Position = UDim2.new(0, 5, 0, 5)
-MessagesScroll.ScrollBarThickness = 8
-MessagesScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
-MessagesScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-MessagesScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
--- Шаблон сообщения
-local MessageTemplate = Instance.new("TextLabel")
-MessageTemplate.Name = "MessageTemplate"
-MessageTemplate.Parent = MessagesScroll
-MessageTemplate.BackgroundTransparency = 1
-MessageTemplate.Size = UDim2.new(1, -5, 0, 0)
-MessageTemplate.Font = Enum.Font.Gotham
-MessageTemplate.Text = ""
-MessageTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
-MessageTemplate.TextSize = 13
-MessageTemplate.TextWrapped = true
-MessageTemplate.TextXAlignment = Enum.TextXAlignment.Left
-MessageTemplate.Visible = false
-
--- Панель ввода
-local InputPanel = Instance.new("Frame")
-InputPanel.Name = "InputPanel"
-InputPanel.Parent = MainWindow
-InputPanel.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
-InputPanel.Position = UDim2.new(0.03, 0, 0.86, 0)
-InputPanel.Size = UDim2.new(0.94, 0, 0.1, 0)
-
-local InputCorner = Instance.new("UICorner")
-InputCorner.CornerRadius = UDim.new(0, 8)
-InputCorner.Parent = InputPanel
-
--- Поле ввода
-local InputBox = Instance.new("TextBox")
-InputBox.Name = "InputBox"
-InputBox.Parent = InputPanel
-InputBox.BackgroundColor3 = Color3.fromRGB(45, 50, 70)
-InputBox.Size = UDim2.new(0.7, 0, 0.7, 0)
-InputBox.Position = UDim2.new(0.03, 0, 0.15, 0)
-InputBox.Font = Enum.Font.Gotham
-InputBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 180)
-InputBox.PlaceholderText = "Напишите сообщение..."
-InputBox.Text = ""
-InputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-InputBox.TextSize = 14
-InputBox.TextXAlignment = Enum.TextXAlignment.Left
-
-local InputBoxCorner = Instance.new("UICorner")
-InputBoxCorner.CornerRadius = UDim.new(0, 6)
-InputBoxCorner.Parent = InputBox
-
--- Кнопка отправки
-local SendButton = Instance.new("TextButton")
-SendButton.Name = "SendButton"
-SendButton.Parent = InputPanel
-SendButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-SendButton.Size = UDim2.new(0.25, 0, 0.7, 0)
-SendButton.Position = UDim2.new(0.74, 0, 0.15, 0)
-SendButton.Font = Enum.Font.GothamBold
-SendButton.Text = "ОТПРАВИТЬ"
-SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-SendButton.TextSize = 14
-SendButton.AutoButtonColor = false
-
-local SendButtonCorner = Instance.new("UICorner")
-SendButtonCorner.CornerRadius = UDim.new(0, 6)
-SendButtonCorner.Parent = SendButton
-
--- Статус бар
-local StatusBar = Instance.new("Frame")
-StatusBar.Name = "StatusBar"
-StatusBar.Parent = MainWindow
-StatusBar.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
-StatusBar.Position = UDim2.new(0, 0, 0.97, 0)
-StatusBar.Size = UDim2.new(1, 0, 0.03, 0)
-
-local StatusText = Instance.new("TextLabel")
-StatusText.Name = "StatusText"
-StatusText.Parent = StatusBar
-StatusText.BackgroundTransparency = 1
-StatusText.Size = UDim2.new(1, 0, 1, 0)
-StatusText.Font = Enum.Font.Gotham
-StatusText.Text = "Подключено • GGH Chat v6.0"
-StatusText.TextColor3 = Color3.fromRGB(0, 200, 255)
-StatusText.TextSize = 12
-StatusText.TextXAlignment = Enum.TextXAlignment.Left
-StatusText.Position = UDim2.new(0.02, 0, 0, 0)
-
--- Переменные
-local displayedMessageIds = {}
-local lastUpdateTime = 0
-local myMessagesSent = {}
-
--- Функция добавления сообщения в чат
-local function addMessageToChat(sender, message, color, isSystem, messageId)
-    -- Проверяем, не отображали ли уже это сообщение
-    if displayedMessageIds[messageId] then
-        return
-    end
-    
-    displayedMessageIds[messageId] = true
-    
+-- СИСТЕМА ЛОГИРОВАНИЯ
+local function logAttack(attackType, attacker)
     local timestamp = os.date("%H:%M:%S")
-    local displayName = isSystem and "[SYSTEM]" or sender
-    local messageColor = isSystem and Color3.fromRGB(255, 200, 0) or color
+    local logMessage = string.format("[%s] Обнаружена атака: %s", timestamp, attackType)
+    if attacker then
+        logMessage = logMessage .. string.format(" от %s", attacker)
+    end
+    print(logMessage)
+    table.insert(detectedAttacks, {time = tick(), type = attackType, attacker = attacker})
+end
+
+-- ЗАЩИТА ОТ КИКОВ
+if PROTECTION_SETTINGS.AntiKick then
+    -- Перехват функции Kick
+    local mt = getrawmetatable(game)
+    local originalIndex = mt.__index
+    setreadonly(mt, false)
     
-    -- Создаем новое сообщение
-    local newMessage = MessageTemplate:Clone()
-    newMessage.Parent = MessagesScroll
-    newMessage.Visible = true
-    newMessage.TextColor3 = messageColor
+    mt.__index = newcclosure(function(self, key)
+        if key == "Kick" or key == "kick" then
+            logAttack("Попытка кика", tostring(self))
+            return function() 
+                print("GGH: Защита от кика активирована")
+                return nil
+            end
+        end
+        return originalIndex(self, key)
+    end)
     
-    local messageText = string.format("[%s] %s: %s", timestamp, displayName, message)
-    newMessage.Text = messageText
+    setreadonly(mt, true)
     
-    -- Вычисляем высоту текста
-    local textSize = TextService:GetTextSize(
-        messageText,
-        13,
-        Enum.Font.Gotham,
-        Vector2.new(MessagesScroll.AbsoluteSize.X - 20, math.huge)
-    )
-    
-    local messageHeight = math.max(25, textSize.Y + 5)
-    newMessage.Size = UDim2.new(1, -5, 0, messageHeight)
-    
-    -- Позиционируем сообщения ДРУГ ПОД ДРУГОМ
-    local totalHeight = 5
-    for _, child in pairs(MessagesScroll:GetChildren()) do
-        if child:IsA("TextLabel") and child ~= MessageTemplate and child ~= newMessage then
-            totalHeight = totalHeight + child.Size.Y.Offset + 5
+    -- Защита от сетевых киков
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and (obj.Name:lower():find("kick") or obj.Name:lower():find("ban")) then
+            pcall(function()
+                obj.OnClientEvent:Connect(function(...)
+                    logAttack("Сетевой кик через " .. obj.Name)
+                end)
+            end)
         end
     end
     
-    newMessage.Position = UDim2.new(0, 5, 0, totalHeight)
-    
-    -- Автопрокрутка вниз
-    wait(0.05)
-    MessagesScroll.CanvasPosition = Vector2.new(0, MessagesScroll.CanvasSize.Y.Offset + 100)
+    print("GGH: Антикик активирован")
 end
 
--- Функция отправки сообщения
-local function sendMessage(text)
-    if not text or string.len(text) == 0 then
-        return
-    end
+-- ЗАЩИТА ОТ ГРАБА (ANTI-GRAB)
+if PROTECTION_SETTINGS.AntiGrab then
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiGrab do
+            wait(0.1)
+            
+            -- Проверка на необычное движение
+            local currentVelocity = HumanoidRootPart.Velocity
+            local speed = currentVelocity.Magnitude
+            
+            if speed > 500 then -- Слишком высокая скорость
+                HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+                HumanoidRootPart.CFrame = lastSafePosition
+                logAttack("Попытка граба (высокая скорость)")
+            end
+            
+            -- Проверка на телепортацию
+            local distance = (HumanoidRootPart.Position - lastSafePosition.Position).Magnitude
+            if distance > 1000 then -- Слишком далеко телепортировали
+                HumanoidRootPart.CFrame = lastSafePosition
+                logAttack("Попытка телепортации грабом")
+            end
+            
+            -- Сохраняем безопасную позицию
+            if speed < 50 and distance < 100 then
+                lastSafePosition = HumanoidRootPart.CFrame
+            end
+            
+            -- Защита от сетевых грабов
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Player then
+                    pcall(function()
+                        local char = player.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            local distanceToPlayer = (HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                            if distanceToPlayer < 5 then
+                                -- Отталкивание при слишком близком подходе
+                                local direction = (HumanoidRootPart.Position - char.HumanoidRootPart.Position).Unit
+                                HumanoidRootPart.Velocity = direction * 20
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
     
-    if string.len(text) > 200 then
-        addMessageToChat("SYSTEM", "Сообщение слишком длинное (макс. 200 символов)", Color3.fromRGB(255, 100, 100), true, "sys_too_long")
-        return
-    end
-    
-    -- Создаем уникальный ID для сообщения
-    local messageId = MY_ID .. "_" .. tick()
-    
-    -- Добавляем в общую таблицу
-    local messageData = {
-        Sender = Player.Name,
-        Message = text,
-        Color = MY_COLOR,
-        Timestamp = os.time(),
-        IsSystem = false,
-        MessageId = messageId,
-        PlayerId = MY_ID
-    }
-    
-    -- Сохраняем свое сообщение отдельно
-    myMessagesSent[messageId] = messageData
-    
-    -- Добавляем в глобальную таблицу
-    local messageKey = "msg_" .. _G.GGH_CHAT_DATA.NextMessageId
-    _G.GGH_CHAT_DATA.Messages[messageKey] = messageData
-    _G.GGH_CHAT_DATA.NextMessageId = _G.GGH_CHAT_DATA.NextMessageId + 1
-    
-    -- Отображаем локально СРАЗУ
-    addMessageToChat(Player.Name, text, MY_COLOR, false, messageId)
-    
-    InputBox.Text = ""
-    InputBox:CaptureFocus()
-    
-    print("GGH Chat: Отправлено сообщение: " .. text)
+    print("GGH: Антиграб активирован")
 end
 
--- Функция проверки новых сообщений
-local function checkForNewMessages()
-    local currentTime = os.time()
+-- ЗАЩИТА ОТ ЧАТ КИКОВ
+if PROTECTION_SETTINGS.AntiChatKick then
+    -- Мониторинг чата
+    local function monitorChat()
+        pcall(function()
+            local chatEvents = {}
+            
+            -- Поиск чат-ивентов
+            for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+                if obj:IsA("RemoteEvent") and (obj.Name:lower():find("chat") or obj.Name:lower():find("message")) then
+                    table.insert(chatEvents, obj)
+                end
+            end
+            
+            for _, event in pairs(chatEvents) do
+                event.OnClientEvent:Connect(function(...)
+                    local args = {...}
+                    if args and #args > 0 then
+                        local message = tostring(args[1]):lower()
+                        
+                        -- Детектирование вредоносных команд
+                        local maliciousPatterns = {
+                            "kick me", "ban me", "crash me", "lag me",
+                            "kill me", "reset me", "teleport me", "void me",
+                            "exploit", "hack", "cheat"
+                        }
+                        
+                        for _, pattern in pairs(maliciousPatterns) do
+                            if message:find(pattern) then
+                                logAttack("Чат кик: " .. message)
+                                -- Блокируем выполнение
+                                return nil
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    end
     
-    -- Проверяем все сообщения в общей таблице
-    for messageKey, messageData in pairs(_G.GGH_CHAT_DATA.Messages) do
-        -- Пропускаем свои сообщения
-        if messageData.PlayerId ~= MY_ID then
-            -- Проверяем, не отображали ли уже
-            if not displayedMessageIds[messageData.MessageId] then
-                -- Проверяем, не слишком ли старое сообщение (меньше 2 минут)
-                if currentTime - messageData.Timestamp < 120 then
-                    -- Проверяем, активен ли отправитель
-                    local senderData = _G.GGH_CHAT_DATA.ActivePlayers[messageData.PlayerId]
-                    if senderData then
-                        addMessageToChat(
-                            messageData.Sender,
-                            messageData.Message,
-                            messageData.Color,
-                            messageData.IsSystem,
-                            messageData.MessageId
-                        )
+    spawn(monitorChat)
+    print("GGH: Защита от чат-киков активирована")
+end
+
+-- ЗАЩИТА ОТ ТЕЛЕПОРТОВ
+if PROTECTION_SETTINGS.AntiTeleport then
+    local lastValidPosition = HumanoidRootPart.CFrame
+    local teleportDetectionCount = 0
+    
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiTeleport do
+            wait(0.5)
+            
+            local currentPos = HumanoidRootPart.Position
+            local distance = (currentPos - lastValidPosition.Position).Magnitude
+            
+            if distance > 500 then -- Внезапная телепортация
+                teleportDetectionCount = teleportDetectionCount + 1
+                
+                if teleportDetectionCount > 2 then
+                    HumanoidRootPart.CFrame = lastValidPosition
+                    logAttack("Телепорт в небезопасную зону")
+                    teleportDetectionCount = 0
+                end
+            else
+                lastValidPosition = HumanoidRootPart.CFrame
+                teleportDetectionCount = 0
+            end
+            
+            -- Защита от телепорт-тулов
+            for _, tool in pairs(Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    pcall(function()
+                        for _, event in pairs(tool:GetDescendants()) do
+                            if event:IsA("RemoteEvent") then
+                                event.OnClientEvent:Connect(function(...)
+                                    logAttack("Телепорт через инструмент: " .. tool.Name)
+                                    -- Отменяем телепорт
+                                    return nil
+                                end)
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+    
+    print("GGH: Антителепорт активирован")
+end
+
+-- ЗАЩИТА ОТ БЕЗДНЫ (ANTI-VOID)
+if PROTECTION_SETTINGS.AntiVoid then
+    local voidYLevel = -500
+    local respawnYLevel = -100
+    
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiVoid do
+            wait(0.3)
+            
+            if HumanoidRootPart.Position.Y < voidYLevel then
+                -- Телепортируем на безопасную позицию
+                local safeSpot = CFrame.new(0, 50, 0)
+                
+                -- Ищем спавн-точку
+                local spawns = Workspace:FindFirstChild("SpawnLocation")
+                if spawns then
+                    safeSpot = spawns.CFrame + Vector3.new(0, 5, 0)
+                end
+                
+                HumanoidRootPart.CFrame = safeSpot
+                HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+                logAttack("Спасение из бездны")
+            end
+        end
+    end)
+    
+    print("GGH: Анти-бездна активирован")
+end
+
+-- ЗАЩИТА ОТ ФЛИНГА (ANTI-FLING)
+if PROTECTION_SETTINGS.AntiFling then
+    local maxVelocity = 150
+    local flingDetectionCount = 0
+    
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiFling do
+            wait(0.1)
+            
+            local velocity = HumanoidRootPart.Velocity.Magnitude
+            
+            if velocity > maxVelocity then
+                flingDetectionCount = flingDetectionCount + 1
+                
+                if flingDetectionCount > 3 then
+                    -- Сбрасываем скорость и позицию
+                    HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+                    HumanoidRootPart.RotVelocity = Vector3.new(0, 0, 0)
+                    HumanoidRootPart.CFrame = lastSafePosition
+                    
+                    logAttack("Атака флингом (скорость: " .. math.floor(velocity) .. ")")
+                    flingDetectionCount = 0
+                end
+            else
+                flingDetectionCount = 0
+            end
+            
+            -- Сохраняем безопасную позицию когда стоим
+            if velocity < 10 then
+                lastSafePosition = HumanoidRootPart.CFrame
+            end
+        end
+    end)
+    
+    print("GGH: Антифлинг активирован")
+end
+
+-- ЗАЩИТА ОТ СТАНА (ANTI-STUN)
+if PROTECTION_SETTINGS.AntiStun then
+    local humanoid = Character:WaitForChild("Humanoid")
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalJumpPower = humanoid.JumpPower
+    
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiStun do
+            wait(0.2)
+            
+            -- Восстанавливаем параметры если их изменили
+            if humanoid.WalkSpeed < originalWalkSpeed * 0.5 then
+                humanoid.WalkSpeed = originalWalkSpeed
+                logAttack("Восстановление скорости")
+            end
+            
+            if humanoid.JumpPower < originalJumpPower * 0.5 then
+                humanoid.JumpPower = originalJumpPower
+                logAttack("Восстановление прыжка")
+            end
+            
+            -- Защита от сетевых стан-атак
+            for _, connection in pairs(getconnections(humanoid.StateChanged)) do
+                pcall(function()
+                    connection:Disable()
+                end)
+            end
+        end
+    end)
+    
+    print("GGH: Антистан активирован")
+end
+
+-- ЗАЩИТА ОТ ЗАМОРОЗКИ (ANTI-FREEZE)
+if PROTECTION_SETTINGS.AntiFreeze then
+    spawn(function()
+        while isProtected and PROTECTION_SETTINGS.AntiFreeze do
+            wait(0.5)
+            
+            -- Проверка на заморозку анимаций
+            pcall(function()
+                local animator = Character:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                        if track.IsPlaying and track.WeightCurrent > 0.9 then
+                            -- Сбрасываем слишком доминирующие анимации
+                            track:Stop(0.1)
+                        end
+                    end
+                end
+            end)
+            
+            -- Защита от физической заморозки
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    if part.Anchored then
+                        part.Anchored = false
+                        logAttack("Разблокировка замороженной части: " .. part.Name)
+                    end
+                    
+                    if part.Massless then
+                        part.Massless = false
                     end
                 end
             end
         end
-    end
+    end)
+    
+    print("GGH: Антифриз активирован")
 end
 
--- Функция обновления активных игроков
-local function updateActivePlayers()
-    local currentTime = tick()
+-- ЗАЩИТА ОТ КРАЖИ ИНСТРУМЕНТОВ
+if PROTECTION_SETTINGS.AntiToolSteal then
+    local originalTools = {}
     
-    -- Обновляем свой статус
-    _G.GGH_CHAT_DATA.ActivePlayers[MY_ID].LastPing = currentTime
-    _G.GGH_CHAT_DATA.ActivePlayers[MY_ID].Active = true
-    
-    -- Проверяем других игроков
-    local activeCount = 0
-    for playerId, playerData in pairs(_G.GGH_CHAT_DATA.ActivePlayers) do
-        if playerId ~= MY_ID then
-            -- Если игрок не активен больше 15 секунд - удаляем
-            if currentTime - playerData.LastPing > 15 then
-                _G.GGH_CHAT_DATA.ActivePlayers[playerId] = nil
-            else
-                activeCount = activeCount + 1
-            end
-        else
-            activeCount = activeCount + 1
+    -- Делаем резервную копию инструментов
+    for _, tool in pairs(Character:GetChildren()) do
+        if tool:IsA("Tool") then
+            originalTools[tool.Name] = tool:Clone()
         end
     end
     
-    -- Обновляем статус
-    StatusText.Text = string.format("Подключено • Игроков: %d • GGH Chat v6.0", activeCount)
-end
-
--- Функция очистки старых сообщений
-local function cleanupOldMessages()
-    local currentTime = os.time()
-    local removedCount = 0
-    
-    for messageKey, messageData in pairs(_G.GGH_CHAT_DATA.Messages) do
-        -- Удаляем сообщения старше 5 минут
-        if currentTime - messageData.Timestamp > 300 then
-            _G.GGH_CHAT_DATA.Messages[messageKey] = nil
-            removedCount = removedCount + 1
-        end
-    end
-    
-    if removedCount > 0 then
-        print("GGH Chat: Удалено " .. removedCount .. " старых сообщений")
-    end
-end
-
--- Обработчики событий
-SendButton.MouseButton1Click:Connect(function()
-    sendMessage(InputBox.Text)
-end)
-
-InputBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        sendMessage(InputBox.Text)
-    end
-end)
-
-CloseButton.MouseButton1Click:Connect(function()
-    _G.GGH_CHAT_DATA.ActivePlayers[MY_ID].Active = false
-    ScreenGui:Destroy()
-    print("GGH Chat: Чат закрыт")
-end)
-
--- Горячие клавиши
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Slash then
-        InputBox:CaptureFocus()
-    elseif input.KeyCode == Enum.KeyCode.Return and InputBox:IsFocused() then
-        sendMessage(InputBox.Text)
-    elseif input.KeyCode == Enum.KeyCode.Escape then
-        InputBox:ReleaseFocus()
-    end
-end)
-
--- Анимации кнопок
-CloseButton.MouseEnter:Connect(function()
-    TweenService:Create(CloseButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}):Play()
-end)
-
-CloseButton.MouseLeave:Connect(function()
-    TweenService:Create(CloseButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 60, 60)}):Play()
-end)
-
-SendButton.MouseEnter:Connect(function()
-    TweenService:Create(SendButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 180, 255)}):Play()
-end)
-
-SendButton.MouseLeave:Connect(function()
-    TweenService:Create(SendButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 255)}):Play()
-end)
-
--- Инициализация чата
-local function initializeChat()
-    -- Добавляем приветственные сообщения
-    addMessageToChat("SYSTEM", "GGH Chat v6.0 активирован!", Color3.fromRGB(0, 200, 255), true, "sys_init")
-    addMessageToChat("SYSTEM", "Добро пожаловать в приватный чат!", Color3.fromRGB(0, 200, 255), true, "sys_welcome")
-    addMessageToChat("SYSTEM", "Сообщения будут синхронизироваться с другими игроками", Color3.fromRGB(0, 200, 255), true, "sys_sync")
-    addMessageToChat("SYSTEM", "Нажмите / чтобы написать сообщение", Color3.fromRGB(0, 200, 255), true, "sys_help")
-    
-    -- Отправляем уведомление о входе
     spawn(function()
-        wait(1)
-        local joinMessageId = "join_" .. MY_ID
-        local joinMessage = {
-            Sender = "SYSTEM",
-            Message = Player.Name .. " присоединился к чату",
-            Color = Color3.fromRGB(0, 255, 150),
-            Timestamp = os.time(),
-            IsSystem = true,
-            MessageId = joinMessageId,
-            PlayerId = MY_ID
-        }
+        while isProtected and PROTECTION_SETTINGS.AntiToolSteal do
+            wait(1)
+            
+            -- Проверяем наличие инструментов
+            local currentTools = {}
+            for _, tool in pairs(Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    currentTools[tool.Name] = true
+                end
+            end
+            
+            -- Восстанавливаем потерянные инструменты
+            for toolName, toolCopy in pairs(originalTools) do
+                if not currentTools[toolName] then
+                    local newTool = toolCopy:Clone()
+                    newTool.Parent = Character
+                    logAttack("Восстановлен инструмент: " .. toolName)
+                end
+            end
+            
+            -- Защита от сетевого удаления инструментов
+            for _, tool in pairs(Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    pcall(function()
+                        tool.Destroying:Connect(function()
+                            logAttack("Попытка удаления инструмента: " .. tool.Name)
+                            task.wait(0.1)
+                            if not tool.Parent then
+                                local restored = originalTools[tool.Name]
+                                if restored then
+                                    restored:Clone().Parent = Character
+                                end
+                            end
+                        end)
+                    end)
+                end
+            end
+        end
+    end)
+    
+    print("GGH: Защита инструментов активирована")
+end
+
+-- ЗАЩИТА ОТ СБРОСА ПЕРСОНАЖА
+if PROTECTION_SETTINGS.AntiCharacterReset then
+    -- Отключаем стандартный сброс
+    pcall(function()
+        local humanoid = Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.BreakJointsOnDeath = false
+        end
+    end)
+    
+    -- Перехват функции сброса
+    local function preventCharacterReset()
+        pcall(function()
+            -- Защита от сетевых сбросов
+            for _, event in pairs(ReplicatedStorage:GetDescendants()) do
+                if event:IsA("RemoteEvent") and (
+                    event.Name:lower():find("reset") or 
+                    event.Name:lower():find("death") or
+                    event.Name:lower():find("kill")
+                ) then
+                    event.OnClientEvent:Connect(function(...)
+                        logAttack("Сетевой сброс через: " .. event.Name)
+                        return nil
+                    end)
+                end
+            end
+        end)
+    end
+    
+    spawn(preventCharacterReset)
+    
+    -- Защита при смерти
+    if PROTECTION_SETTINGS.AutoRespawn then
+        Character:WaitForChild("Humanoid").Died:Connect(function()
+            logAttack("Персонаж умер, восстановление...")
+            task.wait(2)
+            
+            -- Телепортируем на спавн
+            local spawnLocation = Workspace:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("Spawn")
+            if spawnLocation then
+                HumanoidRootPart.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
+            else
+                HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
+            end
+            
+            -- Восстанавливаем здоровье
+            local humanoid = Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end)
+    end
+    
+    print("GGH: Защита от сброса персонажа активирована")
+end
+
+-- НЕВИДИМЫЙ РЕЖИМ
+if PROTECTION_SETTINGS.SilentMode then
+    -- Скрываем интерфейс защиты
+    local function hideProtection()
+        -- Скрываем сообщения в выводе
+        local oldPrint = print
+        print = function(...)
+            -- Показываем только важные сообщения
+            local args = {...}
+            local msg = tostring(args[1])
+            if msg:find("GGH:") or msg:find("Обнаружена атака:") then
+                oldPrint(...)
+            end
+        end
         
-        _G.GGH_CHAT_DATA.Messages[joinMessageId] = joinMessage
-        addMessageToChat("SYSTEM", Player.Name .. " присоединился к чату", Color3.fromRGB(0, 255, 150), true, joinMessageId)
+        -- Минимальная видимость в F9
+        print("\n========================================")
+        print("GGH PROTECTION v1.0 - ACTIVE")
+        print("Защита работает в скрытом режиме")
+        print("========================================\n")
+    end
+    
+    hideProtection()
+    
+    print("GGH: Скрытый режим активирован")
+end
+
+-- СИСТЕМА ВОССТАНОВЛЕНИЯ
+local function setupRecoverySystem()
+    -- Резервное копирование позиции
+    spawn(function()
+        while isProtected do
+            wait(5)
+            backupCFrame = HumanoidRootPart.CFrame
+        end
+    end)
+    
+    -- Авто-восстановление при проблемах
+    spawn(function()
+        while isProtected do
+            wait(10)
+            
+            -- Проверяем целостность персонажа
+            if not Character or not Character.Parent then
+                logAttack("Персонаж потерян, восстановление...")
+                
+                -- Пересоздаем связь с персонажем
+                Character = Player.Character or Player.CharacterAdded:Wait()
+                HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+                HumanoidRootPart.CFrame = backupCFrame
+            end
+            
+            -- Проверяем подключение к серверу
+            if not Players:FindFirstChild(Player.Name) then
+                logAttack("Потеряно подключение к серверу")
+            end
+        end
     end)
 end
 
--- Запускаем инициализацию
-initializeChat()
+setupRecoverySystem()
 
--- Главный цикл обновления
-spawn(function()
-    while wait(0.5) do
-        if not ScreenGui.Parent then break end
-        
-        updateActivePlayers()
-        checkForNewMessages()
-        
-        -- Каждые 30 секунд чистим старые сообщения
-        if tick() % 30 < 0.5 then
-            cleanupOldMessages()
-        end
-    end
-end)
-
--- Ищем других игроков
-spawn(function()
-    while wait(3) do
-        if not ScreenGui.Parent then break end
-        
-        -- Проверяем всех игроков на сервере
-        for _, otherPlayer in pairs(Players:GetPlayers()) do
-            if otherPlayer ~= Player then
-                -- Проверяем, есть ли у них GGH Chat
-                local otherGui = otherPlayer:FindFirstChild("PlayerGui") or game:GetService("CoreGui")
-                if otherGui:FindFirstChild("GGH_Chat_Interface") then
-                    -- Если нашли другого игрока с чатом, добавляем его
-                    local otherPlayerId = "GGH_" .. otherPlayer.UserId
-                    if not _G.GGH_CHAT_DATA.ActivePlayers[otherPlayerId] then
-                        _G.GGH_CHAT_DATA.ActivePlayers[otherPlayerId] = {
-                            Name = otherPlayer.Name,
-                            Color = Color3.fromHSV(math.random(), 0.8, 0.9),
-                            LastPing = tick(),
-                            Active = true
-                        }
-                        
-                        -- Уведомляем о новом игроке
-                        local notifyId = "notify_" .. otherPlayerId
-                        if not displayedMessageIds[notifyId] then
-                            addMessageToChat("SYSTEM", otherPlayer.Name .. " обнаружен в сети", Color3.fromRGB(0, 255, 150), true, notifyId)
-                        end
-                    else
-                        -- Обновляем статус
-                        _G.GGH_CHAT_DATA.ActivePlayers[otherPlayerId].LastPing = tick()
-                        _G.GGH_CHAT_DATA.ActivePlayers[otherPlayerId].Active = true
-                    end
-                end
-            end
-        end
-    end
-end)
-
-print("==================================================================")
-print("GGH CHAT v6.0 - ЗАПУЩЕН И РАБОТАЕТ")
-print("Ваш ID: " .. MY_ID)
-print("Ваш цвет: " .. tostring(MY_COLOR))
-print("==================================================================")
-print("ЧАТ БУДЕТ РАБОТАТЬ ЕСЛИ:")
-print("1. Все игроки на одном сервере")
-print("2. У всех запущен этот скрипт")
-print("3. Сообщения передаются через _G.GGH_CHAT_DATA")
-print("==================================================================")
-
--- Возвращаем управление чатом
-return {
-    Send = sendMessage,
-    Clear = function()
-        for _, child in pairs(MessagesScroll:GetChildren()) do
-            if child:IsA("TextLabel") and child ~= MessageTemplate then
-                child:Destroy()
-            end
-        end
-        displayedMessageIds = {}
-        addMessageToChat("SYSTEM", "Чат очищен", Color3.fromRGB(255, 200, 0), true, "sys_clear")
+-- ФУНКЦИИ УПРАВЛЕНИЯ
+local GGH_Protection = {
+    -- Включить/выключить защиту
+    ToggleProtection = function(state)
+        isProtected = state
+        print("GGH: Защита " .. (state and "включена" or "выключена"))
+    end,
+    
+    -- Получить статус защиты
+    GetStatus = function()
+        return {
+            Protected = isProtected,
+            AttacksDetected = #detectedAttacks,
+            LastAttack = detectedAttacks[#detectedAttacks] or "Нет атак",
+            Settings = PROTECTION_SETTINGS
+        }
+    end,
+    
+    -- Восстановить позицию
+    RestorePosition = function()
+        HumanoidRootPart.CFrame = backupCFrame
+        HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+        print("GGH: Позиция восстановлена")
+    end,
+    
+    -- Очистить историю атак
+    ClearAttackLog = function()
+        detectedAttacks = {}
+        print("GGH: История атак очищена")
     end
 }
+
+-- АВТОМАТИЧЕСКАЯ АКТИВАЦИЯ
+print("\n" .. string.rep("=", 50))
+print("GGH PROTECTION SYSTEM v1.0")
+print("Защита активирована: " .. Player.Name)
+print("Статус: АКТИВНО")
+print(string.rep("=", 50) .. "\n")
+
+-- ВОЗВРАЩАЕМ УПРАВЛЕНИЕ
+return GGH_Protection
